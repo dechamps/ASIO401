@@ -2,12 +2,12 @@ HKCR
 {
 	ForceRemove asio401.ASIO401.1 = s 'ASIO401'
 	{
-		CLSID = s '{462F2ABF-5278-436A-95B6-72CBF65482AE}'
+		CLSID = s '{555EAFF1-3EB7-4587-8220-036F1017088D}'
 	}
 
 	NoRemove CLSID
 	{
-		ForceRemove {462F2ABF-5278-436A-95B6-72CBF65482AE} = s 'ASIO401'
+		ForceRemove {555EAFF1-3EB7-4587-8220-036F1017088D} = s 'ASIO401'
 		{
 			ProgID = s 'asio401.ASIO401.1'
 			InprocServer32 = s '%MODULE%'
@@ -26,7 +26,7 @@ HKLM
 		{
 			ForceRemove ASIO401
 			{
-				val CLSID = s '{462F2ABF-5278-436A-95B6-72CBF65482AE}'
+				val CLSID = s '{555EAFF1-3EB7-4587-8220-036F1017088D}'
 				val Description = s 'ASIO401'
 			}
 		}
