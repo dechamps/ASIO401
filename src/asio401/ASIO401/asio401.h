@@ -149,7 +149,7 @@ namespace asio401 {
 		const HWND windowHandle = nullptr;
 		const Config config;
 
-		ASIOSampleRate sampleRate = 0;
+		ASIOSampleRate sampleRate = 48000;
 		bool sampleRateWasAccessed = false;
 
 		std::optional<PreparedState> preparedState;
