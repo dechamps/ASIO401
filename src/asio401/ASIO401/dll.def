@@ -1,0 +1,14 @@
+; Module-definition file for the ASIO401 DLL
+; Our DLL is a COM class factory, so we only need to export the functions required by COM.
+; We can't use declspec(dllexport) for those because the naming convention doesn't match (leading "@")
+; We also a couple of functions for users that want to instantiate ASIO401 directly (e.g. ASIO401Test).
+
+LIBRARY
+
+EXPORTS
+	DllCanUnloadNow     PRIVATE
+	DllGetClassObject   PRIVATE
+	DllRegisterServer   PRIVATE
+	DllUnregisterServer PRIVATE
+	CreateASIO401
+	ReleaseASIO401

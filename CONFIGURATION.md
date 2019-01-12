@@ -1,20 +1,20 @@
-# FlexASIO Configuration
+# ASIO401 Configuration
 
-FlexASIO does not provide a graphical interface ([GUI][]) to adjust its
+ASIO401 does not provide a graphical interface ([GUI][]) to adjust its
 settings. This is because developing a GUI typically requires a
-significant amount of developer time that FlexASIO, sadly, doesn't have.
+significant amount of developer time that ASIO401, sadly, doesn't have.
 This explains why nothing happens when you click on the ASIO driver
 "configure" or "settings" button in your application.
 
-Instead, FlexASIO settings can be specified using a
-[configuration file][]. FlexASIO will search for a file named
-`FlexASIO.toml` directly inside your Windows user profile folder; for
-example: `C:\Users\Your Name\FlexASIO.toml`.
+Instead, ASIO401 settings can be specified using a
+[configuration file][]. ASIO401 will search for a file named
+`ASIO401.toml` directly inside your Windows user profile folder; for
+example: `C:\Users\Your Name\ASIO401.toml`.
 
 If the file is missing, this is equivalent to supplying an empty file,
-and as a result FlexASIO will use default values for everything.
+and as a result ASIO401 will use default values for everything.
 
-Configuration changes will only take effect after FlexASIO is reinitialized.
+Configuration changes will only take effect after ASIO401 is reinitialized.
 Depending on the ASIO host application, this might require the application to be
 restarted.
 
@@ -22,10 +22,10 @@ The configuration file is a text file that can be edited using any text editor,
 such as Notepad. The file follows the [TOML][] syntax, which is very similar to
 the syntax used for [INI files][]. Every feature described in the [official TOML documentation] should be supported.
 
-FlexASIO will silently ignore attempts to set options that don't exist,
+ASIO401 will silently ignore attempts to set options that don't exist,
 so beware of typos. However, if an existing option is set to an invalid
-value (which includes using the wrong type or missing quotes), FlexASIO
-will *fail to initialize*. The [FlexASIO log][logging] will contain details
+value (which includes using the wrong type or missing quotes), ASIO401
+will *fail to initialize*. The [ASIO401 log][logging] will contain details
 about what went wrong.
 
 ## Example configuration file
@@ -77,17 +77,17 @@ both input and output streams.
 
 #### Option `backend`
 
-*String*-typed option that determines which audio backend FlexASIO will attempt
-to use. In PortAudio parlance, this is called the *host API*. FlexASIO uses the
+*String*-typed option that determines which audio backend ASIO401 will attempt
+to use. In PortAudio parlance, this is called the *host API*. ASIO401 uses the
 term "backend" to avoid potential confusion with the term "ASIO host".
 
-This is by far the most important option in FlexASIO. Changing the backend can
+This is by far the most important option in ASIO401. Changing the backend can
 have wide-ranging consequences on the operation of the entire audio pipeline.
 For more information, see [BACKENDS][].
 
 The value of the option is matched against PortAudio host API names, as
 shown in the output of the [`PortAudioDevices` program][PortAudioDevices]. If
-the specified name doesn't match any host API, FlexASIO will fail to initialize.
+the specified name doesn't match any host API, ASIO401 will fail to initialize.
 
 In practice, PortAudio will recognize the following names: `MME`,
 `Windows DirectSound`, `Windows WASAPI` and `Windows WDM-KS`.
@@ -103,7 +103,7 @@ The default behaviour is to use DirectSound.
 #### Option `bufferSizeSamples`
 
 *Integer*-typed option that determines which ASIO buffer size (in samples)
-FlexASIO will suggest to the ASIO Host application.
+ASIO401 will suggest to the ASIO Host application.
 
 This option, in combination with
 [`suggestedLatencySeconds`][suggestedLatencySeconds],
@@ -117,7 +117,7 @@ useful only when the application does not provide a way to customize the buffer
 size.
 
 The ASIO buffer size is also used as the PortAudio "front" (user) buffer size,
-as FlexASIO bridges the two. Note that, for various technical reasons and
+as ASIO401 bridges the two. Note that, for various technical reasons and
 depending on the backend and settings used (especially the
 [`suggestedLatencySeconds` option][suggestedLatencySeconds]), there are many
 scenarios where additional buffers will be inserted in the audio pipeline
@@ -143,7 +143,7 @@ stream or to the *output* (rendering, playback) audio stream, respectively.
 
 #### Option `device`
 
-*String*-typed option that determines which hardware audio device FlexASIO will
+*String*-typed option that determines which hardware audio device ASIO401 will
 attempt to use.
 
 The value of the option is the *full name* of the device. The list of available
@@ -158,7 +158,7 @@ Beware that a given hardware device will not necessarily have the same name
 under different backends.
 
 If the specified name doesn't match any device under the selected backend,
-FlexASIO will fail to initialize.
+ASIO401 will fail to initialize.
 
 If the option is set to the empty string (`""`), no device will be used; that
 is, the input or output side of the stream will be disabled, and all other
@@ -187,7 +187,7 @@ device set as default in the Windows audio control panel.
 
 #### Option `channels`
 
-*Integer*-typed option that determines how many channels FlexASIO will open the
+*Integer*-typed option that determines how many channels ASIO401 will open the
 hardware audio device with. This is the number of channels the ASIO Host
 Application will see.
 
@@ -228,10 +228,10 @@ correct operation.
 
 #### Option `sampleType`
 
-*String*-typed option that determines which sample format FlexASIO will use with
+*String*-typed option that determines which sample format ASIO401 will use with
 this device.
 
-FlexASIO itself doesn't do any kind of sample type conversion; therefore, this
+ASIO401 itself doesn't do any kind of sample type conversion; therefore, this
 option determines the type of samples on the ASIO side as well as the PortAudio
 side.
 
@@ -240,7 +240,7 @@ internally. If this option is set to a sample type that the device cannot be
 opened with, PortAudio will *automatically* and *implicitly* convert to the
 "closest" type that works. Sadly, this cannot be disabled, which means it's
 impossible to be sure what sample type is actually used in the PortAudio
-backend, aside from examining the [FlexASIO log][logging].
+backend, aside from examining the [ASIO401 log][logging].
 
 The valid values are:
 
@@ -263,14 +263,14 @@ Example:
 sampleType = "Int16"
 ```
 
-The default value is `Float32`, except in WASAPI Exclusive mode, where FlexASIO
+The default value is `Float32`, except in WASAPI Exclusive mode, where ASIO401
 will try to guess the native sample type of the hardware and use that as the
 default.
 
 #### Option `suggestedLatencySeconds`
 
 *Floating-point*-typed option that determines the amount of audio latency (in
-seconds) that FlexASIO will "suggest" to PortAudio. Typically, this has the
+seconds) that ASIO401 will "suggest" to PortAudio. Typically, this has the
 effect of increasing the amount of additional buffering that PortAudio will
 introduce in the audio pipeline in addition to the ASIO buffer itself (see
 [`bufferSizeSamples`][bufferSizeSamples]). As a result, this option can have a

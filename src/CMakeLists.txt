@@ -1,7 +1,7 @@
-# FlexASIO CMake superbuild.
+# ASIO401 CMake superbuild.
 
 cmake_minimum_required(VERSION 3.11)
-project(flexasio DESCRIPTION "FlexASIO Universal ASIO Driver Superbuild")
+project(asio401 DESCRIPTION "ASIO401 Universal ASIO Driver Superbuild")
 include(ExternalProject)
 set(INTERNAL_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/install")
 set(CMAKE_ARGS
@@ -100,8 +100,8 @@ ExternalProject_Add(
 )
 
 ExternalProject_Add(
-    FlexASIO
-    SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/flexasio"
+    ASIO401
+    SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/asio401"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     CMAKE_ARGS ${CMAKE_ARGS}

@@ -1,39 +1,39 @@
-# FlexASIO Frequently Asked Questions
+# ASIO401 Frequently Asked Questions
 
 ## What is PortAudio?
 
 [PortAudio][] is an open-source audio input/output library. It unifies many
 different audio APIs provided by operating systems (e.g. Windows) behind a
-single simplified API, making it easy to write applications (such as FlexASIO)
+single simplified API, making it easy to write applications (such as ASIO401)
 that can leverage the variety of audio features provided by operating systems.
 
-In FlexASIO, the PortAudio library handles most of the business logic of finding
+In ASIO401, the PortAudio library handles most of the business logic of finding
 audio devices, setting them up in the correct way, and transferring audio data.
-In fact, it would be fair to describe FlexASIO as a mere "wrapper" or "glue
+In fact, it would be fair to describe ASIO401 as a mere "wrapper" or "glue
 layer", providing a bridge between the ASIO API and the PortAudio library.
 
-Because FlexASIO does relatively little work compared to PortAudio, most of
-FlexASIO's behaviour, features, limitations, and quirks are ultimately a
+Because ASIO401 does relatively little work compared to PortAudio, most of
+ASIO401's behaviour, features, limitations, and quirks are ultimately a
 reflection of PortAudio's.
 
-**Note:** FlexASIO is not affiliated with PortAudio in any way. It is merely
+**Note:** ASIO401 is not affiliated with PortAudio in any way. It is merely
 using it as a library.
 
 ## Where is the control panel?
 
-There isn't one. FlexASIO settings can only be changed through a [configuration
+There isn't one. ASIO401 settings can only be changed through a [configuration
 file][CONFIGURATION].
 
 The reason for the lack of a proper control panel is because developing a
-graphical user interface requires a lot of time and resources, which FlexASIO
+graphical user interface requires a lot of time and resources, which ASIO401
 currently doesn't have.
 
-## Why does FlexASIO fail to initialize?
+## Why does ASIO401 fail to initialize?
 
-There are many reasons why FlexASIO might refuse to initialize. Sadly, the ASIO
+There are many reasons why ASIO401 might refuse to initialize. Sadly, the ASIO
 API doesn't provide many ways of surfacing error details to applications, and
 many applications don't display them anyway. The best way to shed light on what
-might be going on is to inspect the [FlexASIO log][logging].
+might be going on is to inspect the [ASIO401 log][logging].
 
 Otherwise, initialization failures can usually be traced back to problematic
 settings. Here are some common issues:
@@ -43,29 +43,29 @@ settings. Here are some common issues:
  - **When using WASAPI Shared…**
    - **Only one sample rate is supported**: the one configured in the Windows
      audio device settings for the input *and* output devices.
-     - If the ASIO Host Application uses any other sample rate, FlexASIO will
+     - If the ASIO Host Application uses any other sample rate, ASIO401 will
        fail to initialize.
      - If the selected input and output devices are configured with different
-       sample rates in the Windows audio settings, FlexASIO will fail to
+       sample rates in the Windows audio settings, ASIO401 will fail to
        initialize.
    - **Only one channel count is supported**: the one configured in the Windows
      audio device settings for the selected device.
-     - FlexASIO will fail to initialize if it is configured to use any other
+     - ASIO401 will fail to initialize if it is configured to use any other
        channel count.
    - These limitations are [inherent to WASAPI itself][wasapisr].
  - **When using an exclusive backend (i.e. WASAPI Exclusive, WDM-KS)…**
    - The **sample rate** selected in the ASIO Host Application must be natively
      supported by the hardware audio device.
-   - The **channel count** that FlexASIO is configured to use must be natively
+   - The **channel count** that ASIO401 is configured to use must be natively
      supported by the hardware audio device.
  - **WDM-KS will fail to initialize if the selected device is already in use**
    by any other application, even if no audio is actually playing. This means
    that WDM-KS is unlikely to initialize successfully on the Windows default
    devices; this can be worked around using the
    [`device` configuration option][device].
- - A **FlexASIO (or PortAudio) bug**. If you believe that is the case, please
+ - A **ASIO401 (or PortAudio) bug**. If you believe that is the case, please
    [file a report][report].
-   - In particular, please do file a report if FlexASIO fails to initialize with
+   - In particular, please do file a report if ASIO401 fails to initialize with
      the default configuration, as the defaults are always supposed to work on
      all systems.
 
@@ -86,7 +86,7 @@ two typical causes:
      point or another.
    - This is an inherent limitation of ASIO. The only way to work around it
      would be to adjust for clock drift on-the-fly using sample rate conversion,
-     but that is not supported by FlexASIO and it would have a number of other
+     but that is not supported by ASIO401 and it would have a number of other
      downsides anyway.
  - **Expensive processing** is being done in the critical real-time audio
    streaming loop, or the ASIO Host Application real-time streaming path is
@@ -105,21 +105,21 @@ two typical causes:
      devices (full duplex mode), even if both devices are backed by the same
      hardware. Problems are less likely to occur when using only the input, or
      only the output (half duplex mode).
- - **[FlexASIO logging][logging] is enabled**.
-   - FlexASIO writes to the log using blocking file I/O from critical real-time
+ - **[ASIO401 logging][logging] is enabled**.
+   - ASIO401 writes to the log using blocking file I/O from critical real-time
      code paths. This can easily lead to missed deadlines, especially with small
      buffer sizes.
    - Do not forget to disable logging when you don't need it.
-   - To disable logging, simply delete or move the `FlexASIO.log` file.
- - A **FlexASIO (or PortAudio) bug** (or lack of optimization). If you believe
+   - To disable logging, simply delete or move the `ASIO401.log` file.
+ - A **ASIO401 (or PortAudio) bug** (or lack of optimization). If you believe
    that is the case, please [file a report][report].
 
 ## How to improve the latency?
 
-The default FlexASIO settings are optimized for reliability and ease of use, not
+The default ASIO401 settings are optimized for reliability and ease of use, not
 latency. Worse, the default backend (DirectSound) is known to underestimate its
 own latency, which makes the number misleading. To improve the latency, you will
-need to make some adjustments to the FlexASIO [configuration][].
+need to make some adjustments to the ASIO401 [configuration][].
 
 The best latency (and latency reporting) is provided by the **WASAPI**
 (especially in **exclusive mode**) and **WDM-KS** [backends][]. This is because
@@ -149,7 +149,7 @@ suggestedLatencySeconds = 0.0
 wasapiExclusiveMode = true
 ```
 
-## How reliable are the latency numbers reported by FlexASIO?
+## How reliable are the latency numbers reported by ASIO401?
 
 It depends on the [backend][backends]:
 
@@ -181,9 +181,9 @@ data generated by the ASIO Host Application is delivered to the audio hardware
 as-is, bit-for-bit, with no alteration whatsoever. In particular, no *sample
 rate conversions* nor *bit depth conversions* are made.
 
-The default FlexASIO settings are optimized for reliability and ease of use, not
+The default ASIO401 settings are optimized for reliability and ease of use, not
 bit-perfect streaming. To reach that goal, you will need to make some
-adjustments to the FlexASIO [configuration][]:
+adjustments to the ASIO401 [configuration][]:
 
 - You will want to **avoid *shared* [backends][]** because these go through the
   Windows audio pipeline, which is never bit-perfect (unless perhaps your
@@ -198,14 +198,14 @@ adjustments to the FlexASIO [configuration][]:
   - The only way to ensure no conversions are done is to set things up such that
     the **ASIO sample type** matches the native sample type of the hardware;
     this way, PortAudio will not have to do any conversion.
-    - In WASAPI Exclusive mode, FlexASIO will try to do that automatically by
+    - In WASAPI Exclusive mode, ASIO401 will try to do that automatically by
       guessing the hardware native sample type.
     - Otherwise, the [`sampleType` option][sampleType] can be used to override
-      FlexASIO's choice. This is useful when FlexASIO guesses wrong, when using
+      ASIO401's choice. This is useful when ASIO401 guesses wrong, when using
       WDM-KS, or when the hardware supports more than one native sample type.
   - Sadly, PortAudio does not make it obvious that a sample type conversion is
     taking place. To verify that no conversion is done, you might need to
-    examine the FlexASIO log.
+    examine the ASIO401 log.
 
 A typical bit-perfect configuration might look something like this:
 
@@ -226,7 +226,7 @@ wasapiExclusiveMode = true
 [device]: CONFIGURATION.md#option-device
 [CONFIGURATION]: CONFIGURATION.md
 [logging]: README.md#logging
-[issue #3]: https://github.com/dechamps/FlexASIO/issues/3
+[issue #3]: https://github.com/dechamps/ASIO401/issues/3
 [PortAudio]: http://www.portaudio.com/
 [report]: README.md#reporting-issues-feedback-feature-requests
 [sampleType]: CONFIGURATION.md#option-sampleType

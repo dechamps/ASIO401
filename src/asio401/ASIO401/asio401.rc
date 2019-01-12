@@ -1,0 +1,5 @@
+#include "asio401.rc.h"
+
+IDR_ASIO401 REGISTRY "asio401.rgs"
+
+1 TYPELIB "ASIO401.tlb"

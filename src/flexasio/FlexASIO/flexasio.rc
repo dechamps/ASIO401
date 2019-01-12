@@ -1,5 +1,0 @@
-#include "flexasio.rc.h"
-
-IDR_FLEXASIO REGISTRY "flexasio.rgs"
-
-1 TYPELIB "FlexASIO.tlb"

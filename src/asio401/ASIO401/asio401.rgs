@@ -1,0 +1,34 @@
+HKCR
+{
+	ForceRemove asio401.ASIO401.1 = s 'ASIO401'
+	{
+		CLSID = s '{462F2ABF-5278-436A-95B6-72CBF65482AE}'
+	}
+
+	NoRemove CLSID
+	{
+		ForceRemove {462F2ABF-5278-436A-95B6-72CBF65482AE} = s 'ASIO401'
+		{
+			ProgID = s 'asio401.ASIO401.1'
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Both'
+			}
+		}
+	}
+}
+
+HKLM
+{
+	NoRemove SOFTWARE
+	{
+		NoRemove ASIO
+		{
+			ForceRemove ASIO401
+			{
+				val CLSID = s '{462F2ABF-5278-436A-95B6-72CBF65482AE}'
+				val Description = s 'ASIO401'
+			}
+		}
+	}
+}

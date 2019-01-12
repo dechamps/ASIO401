@@ -1,16 +1,16 @@
-# FlexASIO Developer Information
+# ASIO401 Developer Information
 
 ## Building
 
-FlexASIO is designed to be built using CMake within the Microsoft Visual C++
+ASIO401 is designed to be built using CMake within the Microsoft Visual C++
 2017 toolchain native CMake support.
 
-FlexASIO uses a CMake "superbuild" system (in `/src`) to automatically build the
-dependencies (most notably [PortAudio][]) before building FlexASIO itself. These
+ASIO401 uses a CMake "superbuild" system (in `/src`) to automatically build the
+dependencies (most notably [PortAudio][]) before building ASIO401 itself. These
 dependencies are pulled in as git submodules.
 
 It is strongly recommended to use the superbuild system. Providing dependencies
-manually is quite tedious because FlexASIO uses a highly modular structure that
+manually is quite tedious because ASIO401 uses a highly modular structure that
 relies on many small subprojects.
 
 Note that the ASIOUtil build system will download the [ASIO SDK][] for you
@@ -18,7 +18,7 @@ automatically at configure time.
 
 ## Packaging
 
-The following command will do a clean superbuild and generate a FlexASIO
+The following command will do a clean superbuild and generate a ASIO401
 installer package for you:
 
 ```
