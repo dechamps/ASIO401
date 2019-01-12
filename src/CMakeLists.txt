@@ -44,18 +44,6 @@ ExternalProject_Add(
     EXCLUDE_FROM_ALL
 )
 
-check_git_submodule(portaudio)
-ExternalProject_Add(
-	portaudio
-	SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/portaudio"
-	INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
-    BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
-	CMAKE_ARGS ${CMAKE_ARGS}
-		-DPA_ENABLE_DEBUG_OUTPUT=ON
-		"-DCMAKE_PROJECT_portaudio_INCLUDE=${CMAKE_CURRENT_LIST_DIR}/portaudio.cmake"
-	EXCLUDE_FROM_ALL
-)
-
 check_git_submodule(dechamps_cpputil)
 ExternalProject_Add(
     dechamps_cpputil
@@ -105,7 +93,7 @@ ExternalProject_Add(
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     CMAKE_ARGS ${CMAKE_ARGS}
-    DEPENDS tinytoml portaudio dechamps_cpputil dechamps_cpplog dechamps_ASIOUtil ASIOTest
+    DEPENDS tinytoml dechamps_cpputil dechamps_cpplog dechamps_ASIOUtil ASIOTest
 )
 
 install(DIRECTORY "${INTERNAL_INSTALL_PREFIX}/" DESTINATION "${CMAKE_INSTALL_PREFIX}")

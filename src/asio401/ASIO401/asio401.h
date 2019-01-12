@@ -2,13 +2,8 @@
 
 #include "config.h"
 
-#include "portaudio.h"
-#include "../ASIO401Util/portaudio.h"
-
 #include <dechamps_ASIOUtil/asiosdk/asiosys.h>
 #include <dechamps_ASIOUtil/asiosdk/asio.h>
-
-#include <portaudio.h>
 
 #include <windows.h>
 
@@ -50,20 +45,6 @@ namespace asio401 {
 		void ControlPanel();
 
 	private:
-		struct SampleType {
-			ASIOSampleType asio;
-			PaSampleFormat pa;
-			size_t size;
-		};
-
-		class PortAudioHandle {
-		public:
-			PortAudioHandle();
-			PortAudioHandle(const PortAudioHandle&) = delete;
-			PortAudioHandle(const PortAudioHandle&&) = delete;
-			~PortAudioHandle();
-		};
-
 		class Win32HighResolutionTimer {
 		public:
 			Win32HighResolutionTimer();
@@ -120,8 +101,6 @@ namespace asio401 {
 
 				void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) const;
 
-				PaStreamCallbackResult StreamCallback(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags);
-
 			private:
 				struct SamplePosition {
 					ASIOSamples samples = { 0 };
@@ -149,61 +128,26 @@ namespace asio401 {
 				std::atomic<SamplePosition> samplePosition;
 				Win32HighResolutionTimer win32HighResolutionTimer;
 				Registration registration{ preparedState.runningState, *this };
-				const ActiveStream activeStream;
 			};
-
-			static int StreamCallback(const void *input, void *output, unsigned long frameCount, const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData) throw();
 
 			ASIO401& asio401;
 			const ASIOSampleRate sampleRate;
 			const ASIOCallbacks callbacks;
 
-			// PortAudio buffer addresses are dynamic and are only valid for the duration of the stream callback.
-			// In contrast, ASIO buffer addresses are static and are valid for as long as the stream is running.
-			// Thus we need our own buffer on top of PortAudio's buffers. This doens't add any latency because buffers are copied immediately.
 			Buffers buffers;
 			const std::vector<ASIOBufferInfo> bufferInfos;
 
-			const Stream stream;
-
 			// RunningState will set runningState before ownedRunningState has finished constructing.
 			// This allows PreparedState to properly forward stream callbacks that might fire before RunningState construction is fully complete.
-			// (See https://github.com/dechamps/ASIO401/issues/27)
 			// During steady-state operation, runningState just points to *ownedRunningState.
 			RunningState* runningState = nullptr;
 			std::optional<RunningState> ownedRunningState;
 		};
 
-		static const SampleType float32;
-		static const SampleType int32;
-		static const SampleType int24;
-		static const SampleType int16;
-		static const std::pair<std::string_view, SampleType> sampleTypes[];
-		static SampleType ParseSampleType(std::string_view str);
-		static std::optional<SampleType> WaveFormatToSampleType(const WAVEFORMATEXTENSIBLE& waveFormat);
-		static SampleType SelectSampleType(const Config::Stream&, PaHostApiTypeId, const std::optional<WAVEFORMATEXTENSIBLE>&);
-		static std::string DescribeSampleType(const SampleType&);
-
-		int GetInputChannelCount() const;
-		int GetOutputChannelCount() const;
-		DWORD GetInputChannelMask() const;
-		DWORD GetOutputChannelMask() const;
-
-		Stream OpenStream(bool inputEnabled, bool outputEnabled, double sampleRate, unsigned long framesPerBuffer, PaStreamCallback callback, void* callbackUserData);
-
+		int GetInputChannelCount() const { return 2; }
+		int GetOutputChannelCount() const { return 2; }
 		const HWND windowHandle = nullptr;
 		const Config config;
-
-		PortAudioDebugRedirector portAudioDebugRedirector;
-		PortAudioHandle portAudioHandle;
-
-		const HostApi hostApi;
-		const std::optional<Device> inputDevice;
-		const std::optional<Device> outputDevice;
-		const std::optional<WAVEFORMATEXTENSIBLE> inputFormat;
-		const std::optional<WAVEFORMATEXTENSIBLE> outputFormat;
-		const std::optional<SampleType> inputSampleType;
-		const std::optional<SampleType> outputSampleType;
 
 		ASIOSampleRate sampleRate = 0;
 		bool sampleRateWasAccessed = false;

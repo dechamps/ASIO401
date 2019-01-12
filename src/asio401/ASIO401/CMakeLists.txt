@@ -45,24 +45,16 @@ target_link_libraries(ASIO401_log
 	PRIVATE dechamps_CMakeUtils_version
 )
 
-add_library(ASIO401_portaudio STATIC EXCLUDE_FROM_ALL portaudio.cpp)
-target_link_libraries(ASIO401_portaudio
-	PRIVATE ASIO401Util_portaudio
-	PRIVATE portaudio::portaudio
-)
-
 add_library(ASIO401_asio401 STATIC EXCLUDE_FROM_ALL asio401.cpp)
 target_link_libraries(ASIO401_asio401
 	PUBLIC dechamps_ASIOUtil::asiosdk_asioh
 	PUBLIC dechamps_ASIOUtil::asiosdk_asiosys
 	PUBLIC ASIO401_config
-	PUBLIC ASIO401Util_portaudio
 	PRIVATE dechamps_ASIOUtil::asio
 	PRIVATE ASIO401_log
 	PRIVATE dechamps_cpputil::endian
 	PRIVATE dechamps_cpputil::string
 	PRIVATE dechamps_CMakeUtils_version
-	PRIVATE portaudio::portaudio
 	PRIVATE winmm
 )
 
@@ -71,7 +63,6 @@ add_library(ASIO401 SHARED dll.def asio401.rc ../versioninfo.rc)
 target_compile_definitions(ASIO401 PRIVATE PROJECT_DESCRIPTION="ASIO401 ASIO Driver DLL")
 target_link_libraries(ASIO401
 	PRIVATE ASIO401_casio401
-	PRIVATE ASIO401_portaudio
 	PRIVATE dechamps_CMakeUtils_version_stamp
 	PRIVATE ASIO401_comdll
 	PRIVATE ASIO401_idl
