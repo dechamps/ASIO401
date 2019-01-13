@@ -306,7 +306,46 @@ namespace asio401 {
 			Message(preparedState.callbacks.asioMessage, kAsioSupportsTimeInfo, 0, NULL, NULL) == 1;
 		Log() << "The host " << (result ? "supports" : "does not support") << " time info";
 		return result;
-	}()) {}
+	}()), thread([&] { RunThread(); }) {
+	}
+
+	ASIO401::PreparedState::RunningState::~RunningState() {
+		stopRequested = true;
+		thread.join();
+	}
+
+	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
+		std::vector<char> buffer(preparedState.buffers.bufferSizeInSamples * preparedState.buffers.outputChannelCount);
+
+		while (!stopRequested) {
+			size_t locked_buffer_index = (our_buffer_index + 1) % 2;
+			auto currentSamplePosition = samplePosition.load();
+
+			if (!host_supports_timeinfo) {
+				Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << our_buffer_index;
+				preparedState.callbacks.bufferSwitch(long(our_buffer_index), ASIOTrue);
+				Log() << "bufferSwitch() complete";
+			}
+			else {
+				ASIOTime time = { 0 };
+				time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
+				time.timeInfo.samplePosition = currentSamplePosition.samples;
+				time.timeInfo.systemTime = currentSamplePosition.timestamp;
+				time.timeInfo.sampleRate = preparedState.sampleRate;
+				Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << our_buffer_index << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
+				const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(our_buffer_index), ASIOTrue);
+				Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
+			}
+
+			std::swap(locked_buffer_index, our_buffer_index);
+			currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
+			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
+			Log() << "Updated buffer index: " << our_buffer_index << ", position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << ", timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
+
+			// TODO: actually fill the buffer with data
+			preparedState.asio401.qa401.Write(buffer.data(), buffer.size());
+		}
+	}
 
 	void ASIO401::Stop() {
 		if (!preparedState.has_value()) throw ASIOException(ASE_InvalidMode, "stop() called before createBuffers()");

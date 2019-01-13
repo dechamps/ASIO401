@@ -72,19 +72,33 @@ namespace asio401 {
 		::Sleep(10);
 		WriteRegister(6, 6);
 		WriteRegister(6, 0);
+		WriteRegister(4, 5);
 
 		Log() << "QA401 now ready for streaming";
+	}
+
+	void QA401::Write(void* buffer, size_t size) {
+		Log() << "Writing " << size << " bytes to QA401";
+		WritePipe(writePipeId, buffer, size);
+
+		// Black magic incantation provided by QuantAsylum.
+		WriteRegister(7, 3);
 	}
 
 	void QA401::WriteRegister(uint8_t registerNumber, uint32_t value) {
 		Log() << "Writing " << value << " to QA401 register #" << int(registerNumber);
 		uint8_t request[] = { registerNumber, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value >> 0) };
+		WritePipe(registerPipeId, request, sizeof(request));
+	}
+
+	void QA401::WritePipe(UCHAR pipeId, const void* data, size_t size) {
+		Log() << "Writing " << size << " bytes to pipe " << int(pipeId);
 		ULONG lengthTransferred = 0;
-		if (WinUsb_WritePipe(winUsb.InterfaceHandle(), registerPipeId, request, sizeof(request), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
-			throw std::runtime_error("Unable to write " + std::to_string(sizeof(request)) + " bytes to register pipe: " + GetWindowsErrorString(GetLastError()));
+		if (WinUsb_WritePipe(winUsb.InterfaceHandle(), pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
+			throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to pipe " + std::to_string(int(pipeId)) + GetWindowsErrorString(GetLastError()));
 		}
-		if (lengthTransferred != sizeof(request)) {
-			throw std::runtime_error("Unable to write more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(sizeof(request)) + " bytes to register pipe");
+		if (lengthTransferred != size) {
+			throw std::runtime_error("Unable to write more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " to pipe " + std::to_string(int(pipeId)));
 		}
 	}
 

@@ -11,6 +11,7 @@
 #include <atomic>
 #include <optional>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace asio401 {
@@ -99,6 +100,7 @@ namespace asio401 {
 			class RunningState {
 			public:
 				RunningState(PreparedState& preparedState);
+				~RunningState();
 
 				void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) const;
 
@@ -119,13 +121,18 @@ namespace asio401 {
 					RunningState*& holder;
 				};
 
+				void RunThread();
+
 				PreparedState& preparedState;
 				const bool host_supports_timeinfo;
+				std::atomic<bool> stopRequested = false;
 				// The index of the "unlocked" buffer (or "half-buffer", i.e. 0 or 1) that contains data not currently being processed by the ASIO host.
 				size_t our_buffer_index;
 				std::atomic<SamplePosition> samplePosition;
 				Win32HighResolutionTimer win32HighResolutionTimer;
+
 				Registration registration{ preparedState.runningState, *this };
+				std::thread thread;
 			};
 
 			ASIO401& asio401;
