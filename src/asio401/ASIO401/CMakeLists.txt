@@ -67,6 +67,7 @@ target_link_libraries(ASIO401_qa401
 	PUBLIC ASIO401_winusb
 	PRIVATE ASIO401_log
 	PRIVATE ASIO401Util_windows_error
+	PRIVATE dechamps_cpputil::string
 	PRIVATE winusb
 )
 
