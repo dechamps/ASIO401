@@ -17,7 +17,9 @@ namespace asio401 {
 		Log() << "Opening file handle for USB device at path: " << path;
 		WindowsHandleUniquePtr windowsFile(CreateFileA(std::string(path).c_str(), GENERIC_WRITE | GENERIC_READ, /*dwShareMode=*/0, /*lpSecurityAttributes=*/NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, /*hTemplateFile=*/NULL));
 		if (windowsFile.get() == INVALID_HANDLE_VALUE) {
-			throw std::runtime_error("Unable to open USB device file: " + GetWindowsErrorString(GetLastError()));
+			const auto error = GetLastError();
+			if (error == ERROR_ACCESS_DENIED) throw std::runtime_error("USB device access denied. Is it being used by another application? " + GetWindowsErrorString(error));
+			throw std::runtime_error("Unable to open USB device file: " + GetWindowsErrorString(error));
 		}
 
 		Log() << "Initializing WinUSB";
