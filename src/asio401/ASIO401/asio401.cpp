@@ -72,6 +72,10 @@ namespace asio401 {
 
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
 
+		// According to QuantAsylum, QA401 uses 24-bit big-endian integer samples in 32-bit container, left-aligned
+		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
+		constexpr size_t qa401SampleSize = 4;
+
 	}
 
 	ASIO401::ASIO401(void* sysHandle) :
@@ -136,7 +140,7 @@ namespace asio401 {
 
 		info->isActive = preparedState.has_value() && preparedState->IsChannelActive(info->isInput, info->channel);
 		info->channelGroup = 0;
-		info->type = ASIOSTFloat64LSB;
+		info->type = qa401SampleType;
 		std::stringstream channel_string;
 		channel_string << (info->isInput ? "IN" : "OUT") << " " << getChannelName(info->channel);
 		strcpy_s(info->name, 32, channel_string.str().c_str());
@@ -218,7 +222,7 @@ namespace asio401 {
 		buffers(
 			2,
 			GetBufferInfosChannelCount(asioBufferInfos, numChannels, true), GetBufferInfosChannelCount(asioBufferInfos, numChannels, false),
-			bufferSizeInSamples, sizeof(double), sizeof(double)),
+			bufferSizeInSamples, qa401SampleSize, qa401SampleSize),
 		bufferInfos([&] {
 		std::vector<ASIOBufferInfo> bufferInfos;
 		bufferInfos.reserve(numChannels);
