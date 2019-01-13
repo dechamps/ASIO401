@@ -57,9 +57,7 @@ bufferSizeSamples = 1920 # 40 ms at 48 kHz
 ```
 
 The default behaviour is to advertise minimum, preferred and maximum buffer
-sizes of 1 ms, 20 ms and 1 s, respectively. The resulting sizes in samples are
-computed based on whatever sample rate the driver is set to when the application
-enquires.
+sizes of 256 samples, which is the buffer size QuantAsylum suggests.
 
 [bufferSizeSamples]: #option-bufferSizeSamples
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file

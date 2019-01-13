@@ -98,11 +98,8 @@ namespace asio401 {
 			*granularity = 0;
 		}
 		else {
-			Log() << "Calculating default buffer size based on " << sampleRate << " Hz sample rate";
-			*minSize = long(sampleRate * 0.001); // 1 ms, there's basically no chance we'll get glitch-free streaming below this
-			*maxSize = long(sampleRate); // 1 second, more would be silly
-			*preferredSize = long(sampleRate * 0.02); // 20 ms
-			*granularity = 1; // Don't care
+			*minSize = *maxSize = *preferredSize = 256;  // Suggested by QuantAsylum
+			*granularity = 0;
 		}
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
 	}
