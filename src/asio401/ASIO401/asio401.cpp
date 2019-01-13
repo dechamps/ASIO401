@@ -2,6 +2,7 @@
 
 #include "devices.h"
 
+#include <cassert>
 #include <algorithm>
 #include <memory>
 #include <mutex>
@@ -68,6 +69,20 @@ namespace asio401 {
 				if (!asioBufferInfos[channelIndex].isInput == !input)
 					++result;
 			return result;
+		}
+
+		void CopyToInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, uint8_t* const interleavedBuffer, const long interleavedBufferChannelCount) {
+			for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount) {
+				for (const auto& bufferInfo : bufferInfos) {
+					if (bufferInfo.isInput) continue;
+
+					const auto channelNum = bufferInfo.channelNum;
+					assert(channelNum < interleavedBufferChannelCount);
+					const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+
+					memcpy(interleavedBuffer + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, buffer + sampleCount * sampleSize, sampleSize);
+				}
+			}
 		}
 
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
@@ -315,10 +330,10 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
-		std::vector<char> buffer(preparedState.buffers.bufferSizeInSamples * preparedState.buffers.outputChannelCount);
+		std::vector<uint8_t> buffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
 
 		while (!stopRequested) {
-			size_t locked_buffer_index = (our_buffer_index + 1) % 2;
+			long locked_buffer_index = (our_buffer_index + 1) % 2;
 			auto currentSamplePosition = samplePosition.load();
 
 			if (!host_supports_timeinfo) {
@@ -342,7 +357,7 @@ namespace asio401 {
 			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 			Log() << "Updated buffer index: " << our_buffer_index << ", position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << ", timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 
-			// TODO: actually fill the buffer with data
+			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, buffer.data(), preparedState.asio401.GetOutputChannelCount());
 			preparedState.asio401.qa401.Write(buffer.data(), buffer.size());
 		}
 	}
