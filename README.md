@@ -21,6 +21,7 @@ not QuantAsylum.
 
 ## Requirements
 
+ - A [QA401][] audio analyzer USB device
  - Windows Vista or later
  - Compatible with 32-bit and 64-bit ASIO Host Applications
 
