@@ -25,15 +25,21 @@ namespace asio401 {
 
 	}
 
-	std::string GetDevicePath(const GUID& guid) {
-		Log() << "Searching for a device with GUID {" << GetGUIDString(guid) << "}";
+	std::optional<std::string> GetDevicePath(const GUID& guid) {
+		Log() << "Getting device info set for {" << GetGUIDString(guid) << "}";
 		const DeviceInfoSetPtr deviceInfoSet(::SetupDiGetClassDevsA(&guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
 		if (deviceInfoSet == nullptr) throw std::runtime_error("Unable to get device info set: " + GetWindowsErrorString(::GetLastError()));
 
+		Log() << "Enumerating device interfaces";
 		SP_DEVICE_INTERFACE_DATA deviceInterfaceData;
 		deviceInterfaceData.cbSize = sizeof(deviceInterfaceData);
 		if (::SetupDiEnumDeviceInterfaces(deviceInfoSet.get(), NULL, &guid, 0, &deviceInterfaceData) != TRUE) {
-			throw std::runtime_error("Unable to enumerate device interfaces: " + GetWindowsErrorString(::GetLastError()));
+			const auto error = GetLastError();
+			if (error == ERROR_NO_MORE_ITEMS) {
+				Log() << "Device interface enumeration failed with ERROR_NO_MORE_ITEMS: " << GetWindowsErrorString(error);
+				return std::nullopt;
+			}
+			throw std::runtime_error("Unable to enumerate device interfaces: " + GetWindowsErrorString(error));
 		}
 
 		Log() << "Getting device interface detail buffer size";

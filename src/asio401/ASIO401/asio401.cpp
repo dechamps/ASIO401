@@ -82,7 +82,11 @@ namespace asio401 {
 		return *config;
 	}()) {
 		Log() << "sysHandle = " << sysHandle;
-		Log() << "Device path: " << GetDevicePath(qa401DeviceGUID);
+		const auto devicePath = GetDevicePath(qa401DeviceGUID);
+		if (!devicePath.has_value()) {
+			throw ASIOException(ASE_NotPresent, "QA401 USB device not found. Is it connected?");
+		}
+		Log() << "Device path: " << *devicePath;
 	}
 
 	void ASIO401::GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity)

@@ -2,8 +2,9 @@
 
 #include <rpc.h>
 
+#include <optional>
 #include <string>
 
 namespace asio401 {
-	std::string GetDevicePath(const GUID& guid);
+	std::optional<std::string> GetDevicePath(const GUID& guid);
 }
