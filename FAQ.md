@@ -9,6 +9,28 @@ The reason for the lack of a proper control panel is because developing a
 graphical user interface requires a lot of time and resources, which ASIO401
 currently doesn't have.
 
+## Why does ASIO401 fail to initialize?
+
+ASIO401 can fail to initialize for a variety of reasons. Sadly, the ASIO API
+doesn't provide many ways of surfacing error details to applications, and many
+applications don't display them anyway. The best way to shed light on what might
+be going on is to inspect the [ASIO401 log][logging].
+
+Remember that **ASIO401 will only work after the [QuantAsylum Analyzer][]
+application has configured the hardware first**. ASIO401 does not know how to do
+that by itself, and relies on the QuantAsylum-provided application to prepare
+the hardware. You will need to do that again every time you power cycle the
+QA401.
+
+If the [QuantAsylum Analyzer][] application itself doesn't work, you might want
+to double-check that the QA401 is connected. You might want to read the
+Troubleshooting section of the QA401 User Manual. If all else fails, you might
+want to ask [QuantAsylum][] themselves for help, but note that QuantAsylum will
+only provide support for their applications, not ASIO401.
+
+If the QuantAsylum Analyzer application works, but ASIO401 doesn't, you might
+have found a bug in ASIO401. Feel free to [file a report][report].
+
 ## Why am I getting "glitches" (cracks, pops) in the audio?
 
 A more technical term for these is *discontinuities*. They are often caused by
@@ -43,4 +65,6 @@ two typical causes:
 [bufferSizeSamples]: CONFIGURATION.md#option-bufferSizeSamples
 [CONFIGURATION]: CONFIGURATION.md
 [logging]: README.md#logging
+[QuantAsylum]: https://github.com/QuantAsylum
+[QuantAsylum Analyzer]: https://github.com/QuantAsylum/QA401/releases
 [report]: README.md#reporting-issues-feedback-feature-requests
