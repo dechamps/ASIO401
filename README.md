@@ -26,7 +26,16 @@ not QuantAsylum.
 
 ## Usage
 
-TODO
+[Install][releases] ASIO401, then:
+
+1. Connect the QA401 to your computer.
+2. Open the [QuantAsylum Analyzer][] application.
+3. Wait for the *Configuring hardware...* message to disappear.
+4. Close the QuantAsylum Analyzer application.
+5. Run your ASIO Host Application. ASIO401 should appear in the ASIO driver
+   list.
+
+You will need to repeat these steps every time you power cycle the QA401.
 
 ## Troubleshooting
 
@@ -93,6 +102,7 @@ while the problem is occurring, and attach it to your report. The output of
 [GitHub issue tracker]: https://github.com/dechamps/ASIO401/issues
 [logging]: #logging
 [QuantAsylum]: https://quantasylum.com/
+[QuantAsylum Analyzer]: https://github.com/QuantAsylum/QA401/releases
 [QA401]: https://quantasylum.com/products/qa401-audio-analyzer
 [releases]: https://github.com/dechamps/ASIO401/releases
 [report]: #reporting-issues-feedback-feature-requests
