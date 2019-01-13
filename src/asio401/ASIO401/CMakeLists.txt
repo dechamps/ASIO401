@@ -61,12 +61,20 @@ target_link_libraries(ASIO401_winusb
 	PRIVATE winusb
 )
 
+add_library(ASIO401_qa401 STATIC EXCLUDE_FROM_ALL qa401.cpp)
+target_link_libraries(ASIO401_qa401
+	PUBLIC ASIO401_winusb
+	PRIVATE ASIO401_log
+	PRIVATE ASIO401Util_windows_error
+	PRIVATE winusb
+)
+
 add_library(ASIO401_asio401 STATIC EXCLUDE_FROM_ALL asio401.cpp)
 target_link_libraries(ASIO401_asio401
 	PUBLIC dechamps_ASIOUtil::asiosdk_asioh
 	PUBLIC dechamps_ASIOUtil::asiosdk_asiosys
 	PUBLIC ASIO401_config
-	PUBLIC ASIO401_winusb
+	PUBLIC ASIO401_qa401
 	PRIVATE dechamps_ASIOUtil::asio
 	PRIVATE ASIO401_devices
 	PRIVATE ASIO401_log

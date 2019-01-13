@@ -80,13 +80,13 @@ namespace asio401 {
 		const auto config = LoadConfig();
 		if (!config.has_value()) throw ASIOException(ASE_HWMalfunction, "could not load ASIO401 configuration. See ASIO401 log for details.");
 		return *config;
-	}()), winUsbHandle(WinUsbOpen([&] {
+	}()), qa401([&] {
 		const auto devicePath = GetDevicePath(qa401DeviceGUID);
 		if (!devicePath.has_value()) {
 			throw ASIOException(ASE_NotPresent, "QA401 USB device not found. Is it connected?");
 		}
 		return *devicePath;
-	}())) {
+	}()) {
 		Log() << "sysHandle = " << sysHandle;
 	}
 
