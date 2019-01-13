@@ -119,9 +119,6 @@ namespace asio401 {
 					RunningState*& holder;
 				};
 
-				void Register() { preparedState.runningState = this; }
-				void Unregister() { preparedState.runningState = nullptr; }
-
 				PreparedState& preparedState;
 				const bool host_supports_timeinfo;
 				// The index of the "unlocked" buffer (or "half-buffer", i.e. 0 or 1) that contains data not currently being processed by the ASIO host.
