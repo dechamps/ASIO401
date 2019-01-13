@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.h"
+#include "winusb.h"
 
 #include <dechamps_ASIOUtil/asiosdk/asiosys.h>
 #include <dechamps_ASIOUtil/asiosdk/asio.h>
@@ -148,6 +149,7 @@ namespace asio401 {
 		int GetOutputChannelCount() const { return 2; }
 		const HWND windowHandle = nullptr;
 		const Config config;
+		const WinUsbHandle winUsbHandle;
 
 		ASIOSampleRate sampleRate = 48000;
 		bool sampleRateWasAccessed = false;
