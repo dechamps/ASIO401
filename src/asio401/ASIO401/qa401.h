@@ -11,6 +11,10 @@ namespace asio401 {
 		QA401(std::string_view devicePath);
 
 	private:
+		void Validate();
+		void PrepareDeviceForStreaming();
+		void WriteRegister(uint8_t registerNumber, uint32_t value);
+
 		WinUsbHandle winUsb;
 	};
 
