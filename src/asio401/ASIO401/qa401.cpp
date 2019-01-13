@@ -20,6 +20,15 @@ namespace asio401 {
 		if (usbInterfaceDescriptor.bNumEndpoints == 0) {
 			throw std::runtime_error("No USB endpoints - did you run the QuantAsylum Analyzer app first to configure the hardware?");
 		}
+
+		for (UCHAR endpointIndex = 0; endpointIndex < usbInterfaceDescriptor.bNumEndpoints; ++endpointIndex) {
+			Log() << "Querying pipe #" << int(endpointIndex);
+			WINUSB_PIPE_INFORMATION pipeInformation = { 0 };
+			if (WinUsb_QueryPipe(winUsb.InterfaceHandle(), 0, endpointIndex, &pipeInformation) != TRUE) {
+				throw std::runtime_error("Unable to query WinUSB pipe #" + std::to_string(int(endpointIndex)) + ": " + GetWindowsErrorString(GetLastError()));
+			}
+			Log() << "Pipe information: " << DescribeWinUsbPipeInformation(pipeInformation);
+		}
 	}
 
 }

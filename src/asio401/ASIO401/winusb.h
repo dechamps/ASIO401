@@ -9,6 +9,9 @@
 
 namespace asio401 {
 
+	std::string GetUsbdPipeTypeString(USBD_PIPE_TYPE usbdPipeType);
+	std::string DescribeWinUsbPipeInformation(const WINUSB_PIPE_INFORMATION& winUsbPipeInformation);
+
 	struct WinUsbInterfaceHandleDeleter {
 		void operator()(WINUSB_INTERFACE_HANDLE winUsbInterfaceHandle);
 	};
