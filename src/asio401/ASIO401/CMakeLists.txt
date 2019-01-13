@@ -45,12 +45,21 @@ target_link_libraries(ASIO401_log
 	PRIVATE dechamps_CMakeUtils_version
 )
 
+add_library(ASIO401_devices STATIC EXCLUDE_FROM_ALL devices.cpp)
+target_link_libraries(ASIO401_devices
+	PRIVATE ASIO401_log
+	PRIVATE ASIO401Util_guid
+	PRIVATE ASIO401Util_windows_error
+	PRIVATE SetupAPI
+)
+
 add_library(ASIO401_asio401 STATIC EXCLUDE_FROM_ALL asio401.cpp)
 target_link_libraries(ASIO401_asio401
 	PUBLIC dechamps_ASIOUtil::asiosdk_asioh
 	PUBLIC dechamps_ASIOUtil::asiosdk_asiosys
 	PUBLIC ASIO401_config
 	PRIVATE dechamps_ASIOUtil::asio
+	PRIVATE ASIO401_devices
 	PRIVATE ASIO401_log
 	PRIVATE dechamps_cpputil::endian
 	PRIVATE dechamps_cpputil::string

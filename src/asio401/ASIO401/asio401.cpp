@@ -1,5 +1,7 @@
 #include "asio401.h"
 
+#include "devices.h"
+
 #include <algorithm>
 #include <memory>
 #include <mutex>
@@ -68,6 +70,8 @@ namespace asio401 {
 			return result;
 		}
 
+		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
+
 	}
 
 	ASIO401::ASIO401(void* sysHandle) :
@@ -78,6 +82,7 @@ namespace asio401 {
 		return *config;
 	}()) {
 		Log() << "sysHandle = " << sysHandle;
+		Log() << "Device path: " << GetDevicePath(qa401DeviceGUID);
 	}
 
 	void ASIO401::GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity)
