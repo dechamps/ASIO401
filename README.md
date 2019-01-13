@@ -1,4 +1,4 @@
-# ASIO401
+# ASIO401, the unofficial QA401 ASIO driver
 *Brought to you by [Etienne Dechamps][] - [GitHub][]*
 
 **If you are looking for an installer, see the
@@ -6,7 +6,18 @@
 
 ## Description
 
-TODO
+This is an unofficial [ASIO][] audio driver for the [QuantAsylum][] [QA401][]
+audio analyzer USB device. This makes it possible to use the QA401 in any
+audio application that supports ASIO, including third-party audio measurement
+software (e.g. [REW][]).
+
+This is an early prototype that only supports output for now, and is probably
+unreliable.
+
+**DISCLAIMER :** while this driver was developed with the help of QuantAsylum
+(with my thanks to Matt Taylor), it is not officially endorsed nor supported by
+QuantAsylum in any way. Please direct any support requests [to ASIO401][report],
+not QuantAsylum.
 
 ## Requirements
 
@@ -81,6 +92,9 @@ while the problem is occurring, and attach it to your report. The output of
 [GitHub]: https://github.com/dechamps/ASIO401
 [GitHub issue tracker]: https://github.com/dechamps/ASIO401/issues
 [logging]: #logging
+[QuantAsylum]: https://quantasylum.com/
+[QA401]: https://quantasylum.com/products/qa401-audio-analyzer
 [releases]: https://github.com/dechamps/ASIO401/releases
 [report]: #reporting-issues-feedback-feature-requests
+[REW]: https://www.roomeqwizard.com/
 [test]: #test-program
