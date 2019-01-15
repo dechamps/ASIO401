@@ -47,15 +47,6 @@ namespace asio401 {
 		void ControlPanel();
 
 	private:
-		class Win32HighResolutionTimer {
-		public:
-			Win32HighResolutionTimer();
-			Win32HighResolutionTimer(const Win32HighResolutionTimer&) = delete;
-			Win32HighResolutionTimer(Win32HighResolutionTimer&&) = delete;
-			~Win32HighResolutionTimer();
-			DWORD GetTimeMilliseconds() const;
-		};
-
 		class PreparedState {
 		public:
 			PreparedState(ASIO401& asio401, ASIOSampleRate sampleRate, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInSamples, ASIOCallbacks* callbacks);
@@ -126,10 +117,7 @@ namespace asio401 {
 				PreparedState& preparedState;
 				const bool host_supports_timeinfo;
 				std::atomic<bool> stopRequested = false;
-				// The index of the "unlocked" buffer (or "half-buffer", i.e. 0 or 1) that contains data not currently being processed by the ASIO host.
-				long our_buffer_index;
 				std::atomic<SamplePosition> samplePosition;
-				Win32HighResolutionTimer win32HighResolutionTimer;
 
 				Registration registration{ preparedState.runningState, *this };
 				std::thread thread;

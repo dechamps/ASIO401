@@ -22,18 +22,22 @@
 
 namespace asio401 {
 
-	ASIO401::Win32HighResolutionTimer::Win32HighResolutionTimer() {
-		Log() << "Starting high resolution timer";
-		timeBeginPeriod(1);
-	}
-	ASIO401::Win32HighResolutionTimer::~Win32HighResolutionTimer() {
-		Log() << "Stopping high resolution timer";
-		timeEndPeriod(1);
-	}
-
-	DWORD ASIO401::Win32HighResolutionTimer::GetTimeMilliseconds() const { return timeGetTime(); }
-
 	namespace {
+
+		class Win32HighResolutionTimer {
+		public:
+			Win32HighResolutionTimer() {
+				Log() << "Starting high resolution timer";
+				timeBeginPeriod(1);
+			}
+			Win32HighResolutionTimer(const Win32HighResolutionTimer&) = delete;
+			Win32HighResolutionTimer(Win32HighResolutionTimer&&) = delete;
+			~Win32HighResolutionTimer() {
+				Log() << "Stopping high resolution timer";
+				timeEndPeriod(1);
+			}
+			DWORD GetTimeMilliseconds() const { return timeGetTime(); }
+		};
 
 		std::optional<ASIOSampleRate> previousSampleRate;
 
@@ -313,7 +317,6 @@ namespace asio401 {
 
 	ASIO401::PreparedState::RunningState::RunningState(PreparedState& preparedState) :
 		preparedState(preparedState),
-		our_buffer_index(0),
 		host_supports_timeinfo([&] {
 		Log() << "Checking if the host supports time info";
 		const bool result = preparedState.callbacks.asioMessage &&
@@ -331,7 +334,8 @@ namespace asio401 {
 
 	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
 		std::vector<uint8_t> buffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
-
+		long our_buffer_index = 0;
+		Win32HighResolutionTimer win32HighResolutionTimer;
 		while (!stopRequested) {
 			long locked_buffer_index = (our_buffer_index + 1) % 2;
 			auto currentSamplePosition = samplePosition.load();
