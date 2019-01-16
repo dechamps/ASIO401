@@ -121,7 +121,7 @@ namespace asio401 {
 			*granularity = 0;
 		}
 		else {
-			*minSize = *maxSize = *preferredSize = 256;  // Suggested by QuantAsylum
+			*minSize = *maxSize = *preferredSize = 1024;
 			*granularity = 0;
 		}
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
