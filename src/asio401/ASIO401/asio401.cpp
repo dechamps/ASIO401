@@ -342,6 +342,7 @@ namespace asio401 {
 
 			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, buffer.data(), preparedState.asio401.GetOutputChannelCount());
 			preparedState.asio401.qa401.Write(buffer.data(), buffer.size());
+			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 
 			if (!host_supports_timeinfo) {
 				Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << our_buffer_index;
@@ -361,7 +362,6 @@ namespace asio401 {
 
 			std::swap(locked_buffer_index, our_buffer_index);
 			currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
-			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 			Log() << "Updated buffer index: " << our_buffer_index << ", position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << ", timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 		}
 	}
