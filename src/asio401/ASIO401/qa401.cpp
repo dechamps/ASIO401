@@ -77,7 +77,7 @@ namespace asio401 {
 		Log() << "QA401 now ready for streaming";
 	}
 
-	void QA401::Write(void* buffer, size_t size) {
+	void QA401::Write(const void* buffer, size_t size) {
 		Log() << "Writing " << size << " bytes to QA401";
 		WritePipe(writePipeId, buffer, size);
 
