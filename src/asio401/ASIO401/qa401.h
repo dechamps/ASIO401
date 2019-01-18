@@ -10,7 +10,6 @@ namespace asio401 {
 	public:
 		QA401(std::string_view devicePath);
 
-		void Stream();
 		void Write(const void* buffer, size_t size);
 		void Read(void* buffer, size_t size);
 
