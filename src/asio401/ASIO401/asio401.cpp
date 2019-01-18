@@ -89,6 +89,20 @@ namespace asio401 {
 			}
 		}
 
+		void CopyFromInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, const uint8_t* const interleavedBuffer, const long interleavedBufferChannelCount) {
+			for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount) {
+				for (const auto& bufferInfo : bufferInfos) {
+					if (!bufferInfo.isInput) continue;
+
+					const auto channelNum = bufferInfo.channelNum;
+					assert(channelNum < interleavedBufferChannelCount);
+					const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+
+					memcpy(buffer + sampleCount * sampleSize, interleavedBuffer + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, sampleSize);
+				}
+			}
+		}
+
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
 
 		// According to QuantAsylum, QA401 uses 24-bit big-endian integer samples in 32-bit container, left-aligned
@@ -333,15 +347,19 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
-		std::vector<uint8_t> buffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
+		std::vector<uint8_t> writeBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
+		std::vector<uint8_t> readBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
 		long our_buffer_index = 0;
 		Win32HighResolutionTimer win32HighResolutionTimer;
 		while (!stopRequested) {
 			long locked_buffer_index = (our_buffer_index + 1) % 2;
 			auto currentSamplePosition = samplePosition.load();
 
-			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, buffer.data(), preparedState.asio401.GetOutputChannelCount());
-			preparedState.asio401.qa401.Write(buffer.data(), buffer.size());
+			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+			preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
+			preparedState.asio401.qa401.Read(readBuffer.data(), readBuffer.size());
+			CopyFromInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+
 			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 
 			if (!host_supports_timeinfo) {

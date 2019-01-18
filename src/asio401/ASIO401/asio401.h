@@ -137,7 +137,7 @@ namespace asio401 {
 			std::optional<RunningState> ownedRunningState;
 		};
 
-		int GetInputChannelCount() const { return 0; }
+		int GetInputChannelCount() const { return 2; }
 		int GetOutputChannelCount() const { return 2; }
 		const HWND windowHandle = nullptr;
 		const Config config;

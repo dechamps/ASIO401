@@ -16,7 +16,7 @@ namespace asio401 {
 
 		constexpr UCHAR registerPipeId = 0x02;
 		constexpr UCHAR writePipeId = 0x04;
-		constexpr UCHAR readPipeId = 0x86;
+		constexpr UCHAR readPipeId = 0x88;
 
 		const auto requiredPipeIds = { registerPipeId, writePipeId, readPipeId };
 
@@ -85,6 +85,11 @@ namespace asio401 {
 		WriteRegister(7, 3);
 	}
 
+	void QA401::Read(void* buffer, size_t size) {
+		Log() << "Reading " << size << " bytes from QA401";
+		ReadPipe(readPipeId, buffer, size);
+	}
+
 	void QA401::WriteRegister(uint8_t registerNumber, uint32_t value) {
 		Log() << "Writing " << value << " to QA401 register #" << int(registerNumber);
 		uint8_t request[] = { registerNumber, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value >> 0) };
@@ -99,6 +104,17 @@ namespace asio401 {
 		}
 		if (lengthTransferred != size) {
 			throw std::runtime_error("Unable to write more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " to pipe " + std::to_string(int(pipeId)));
+		}
+	}
+
+	void QA401::ReadPipe(UCHAR pipeId, void* data, size_t size) {
+		Log() << "Reading " << size << " bytes from pipe " << int(pipeId);
+		ULONG lengthTransferred = 0;
+		if (WinUsb_ReadPipe(winUsb.InterfaceHandle(), pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
+			throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from pipe " + std::to_string(int(pipeId)) + GetWindowsErrorString(GetLastError()));
+		}
+		if (lengthTransferred != size) {
+			throw std::runtime_error("Unable to read more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " from pipe " + std::to_string(int(pipeId)));
 		}
 	}
 

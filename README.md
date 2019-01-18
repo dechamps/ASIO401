@@ -11,8 +11,7 @@ audio analyzer USB device. This makes it possible to use the QA401 in any
 audio application that supports ASIO, including third-party audio measurement
 software (e.g. [REW][]).
 
-This is an early prototype that only supports output for now, and is probably
-unreliable.
+This is an early prototype that is still somewhat unreliable.
 
 **DISCLAIMER :** while this driver was developed with the help of QuantAsylum
 (with my thanks to Matt Taylor), it is not officially endorsed nor supported by
