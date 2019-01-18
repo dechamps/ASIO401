@@ -135,7 +135,7 @@ namespace asio401 {
 			*granularity = 0;
 		}
 		else {
-			*minSize = *maxSize = *preferredSize = 1024;
+			*minSize = *maxSize = *preferredSize = 512;
 			*granularity = 0;
 		}
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;

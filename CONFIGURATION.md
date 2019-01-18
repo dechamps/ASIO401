@@ -45,6 +45,11 @@ This option can have a major impact on reliability and latency. Smaller buffers
 will reduce latency but will increase the likelihood of glitches/discontinuities
 (buffer overflow/underrun) if the audio pipeline is not fast enough.
 
+Reads and writes to the QA401 happen once per buffer length, and the maximum
+queue size of the QA401 is 1024 samples. For this reason, a buffer size of 1024
+samples or more is unlikely to work well, as the record queue would not be
+drained in time to avoid buffer overflow.
+
 Note that some host applications might already provide a user-controlled buffer
 size setting; in this case, there should be no need to use this option. It is
 useful only when the application does not provide a way to customize the buffer
@@ -53,11 +58,11 @@ size.
 Example:
 
 ```toml
-bufferSizeSamples = 1920 # 40 ms at 48 kHz
+bufferSizeSamples = 256 # 5.3 ms at 48 kHz
 ```
 
 The default behaviour is to advertise minimum, preferred and maximum buffer
-sizes of 256 samples, which is the buffer size QuantAsylum suggests.
+sizes of 512 samples.
 
 [bufferSizeSamples]: #option-bufferSizeSamples
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file
