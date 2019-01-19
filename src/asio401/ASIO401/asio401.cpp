@@ -381,6 +381,7 @@ namespace asio401 {
 		AvrtHighPriority avrtHighPriority;
 		// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
 		size_t inputBuffersToSkip = 1;
+		bool started = false;
 		while (!stopRequested) {
 			auto currentSamplePosition = samplePosition.load();
 			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
@@ -411,6 +412,12 @@ namespace asio401 {
 				--inputBuffersToSkip;
 			}
 			else {
+				if (!started) {
+					Log() << "Starting QA401";
+					preparedState.asio401.qa401.Start();
+					started = true;
+				}
+
 				Log() << "Reading from QA401 to buffer index " << driverBufferIndex;
 				preparedState.asio401.qa401.Read(readBuffer.data(), readBuffer.size());
 				CopyFromInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());

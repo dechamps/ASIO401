@@ -85,9 +85,15 @@ namespace asio401 {
 		::Sleep(10);
 		WriteRegister(6, 6);
 		WriteRegister(6, 0);
-		WriteRegister(4, 5);
 
 		Log() << "QA401 now ready for streaming";
+	}
+
+	void QA401::Start() {
+		Log() << "Starting QA401 streaming";
+
+		// Black magic incantation provided by QuantAsylum.
+		WriteRegister(4, 5);
 	}
 
 	void QA401::Write(const void* buffer, size_t size) {
