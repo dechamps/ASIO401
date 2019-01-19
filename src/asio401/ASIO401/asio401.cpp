@@ -11,12 +11,16 @@
 #include <string_view>
 #include <vector>
 
+#include <avrt.h>
+
 #include <dechamps_cpputil/endian.h>
 #include <dechamps_cpputil/string.h>
 
 #include <dechamps_ASIOUtil/asio.h>
 
 #include <dechamps_CMakeUtils/version.h>
+
+#include "../ASIO401Util/windows_error.h"
 
 #include "log.h"
 
@@ -37,6 +41,29 @@ namespace asio401 {
 				timeEndPeriod(1);
 			}
 			DWORD GetTimeMilliseconds() const { return timeGetTime(); }
+		};
+
+		class AvrtHighPriority {
+		public:
+			AvrtHighPriority() : avrtHandle([&] {
+				Log() << "Setting thread characteristics";
+				DWORD taskIndex = 0;
+				auto avrtHandle = AvSetMmThreadCharacteristicsA("Pro Audio", &taskIndex);
+				if (avrtHandle == 0) Log() << "Failed to set thread characteristics: " << GetWindowsErrorString(GetLastError());
+				return avrtHandle;
+			}()) {
+				if (avrtHandle == 0) return;
+				Log() << "Setting thread priority";
+				if (AvSetMmThreadPriority(avrtHandle, AVRT_PRIORITY_CRITICAL) == 0) Log() << "Unable to set thread priority: " << GetWindowsErrorString(GetLastError());
+			}
+
+			~AvrtHighPriority() {
+				Log() << "Reverting thread characteristics";
+				if (AvRevertMmThreadCharacteristics(avrtHandle) == 0) Log() << "Failed to revert thread characteristics: " << GetWindowsErrorString(GetLastError());
+			}
+
+		private:
+			const HANDLE avrtHandle;
 		};
 
 		std::optional<ASIOSampleRate> previousSampleRate;
@@ -351,6 +378,7 @@ namespace asio401 {
 		std::vector<uint8_t> readBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
 		long driverBufferIndex = 0;
 		Win32HighResolutionTimer win32HighResolutionTimer;
+		AvrtHighPriority avrtHighPriority;
 		// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
 		size_t inputBuffersToSkip = 1;
 		while (!stopRequested) {

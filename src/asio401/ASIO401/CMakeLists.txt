@@ -84,6 +84,7 @@ target_link_libraries(ASIO401_asio401
 	PRIVATE dechamps_cpputil::string
 	PRIVATE dechamps_CMakeUtils_version
 	PRIVATE winmm
+	PRIVATE avrt
 )
 
 # Note: this is SHARED, not MODULE, otherwise CMake refuses to link that in ASIO401Test.
