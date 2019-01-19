@@ -20,6 +20,19 @@ namespace asio401 {
 
 		const auto requiredPipeIds = { registerPipeId, writePipeId, readPipeId };
 
+		std::string GetPipeIdString(UCHAR pipeId) {
+			std::stringstream result;
+			result.fill('0');
+			result << "Pipe ID 0x" << std::hex << std::setw(2) << int(pipeId) << std::dec << " [";
+			switch (pipeId) {
+			case registerPipeId: result << "register, "; break;
+			case writePipeId: result << "write, "; break;
+			case readPipeId: result << "read, "; break;
+			}
+			result << (pipeId & 0x80 ? "IN" : "OUT") << "]";
+			return result.str();
+		}
+
 	}
 
 	QA401::QA401(std::string_view devicePath) :
@@ -47,11 +60,11 @@ namespace asio401 {
 			if (WinUsb_QueryPipe(winUsb.InterfaceHandle(), 0, endpointIndex, &pipeInformation) != TRUE) {
 				throw std::runtime_error("Unable to query WinUSB pipe #" + std::to_string(int(endpointIndex)) + ": " + GetWindowsErrorString(GetLastError()));
 			}
-			Log() << "Pipe information: " << DescribeWinUsbPipeInformation(pipeInformation);
+			Log() << "Pipe (" << GetPipeIdString(pipeInformation.PipeId) << ") information: " << DescribeWinUsbPipeInformation(pipeInformation);
 			missingPipeIds.erase(pipeInformation.PipeId);
 		}
 		if (!missingPipeIds.empty()) {
-			throw std::runtime_error("Could not find WinUSB pipe IDs: " + ::dechamps_cpputil::Join(missingPipeIds, ", ", ::dechamps_cpputil::CharAsNumber()));
+			throw std::runtime_error("Could not find WinUSB pipes: " + ::dechamps_cpputil::Join(missingPipeIds, ", ", GetPipeIdString));
 		}
 		
 		Log() << "QA401 descriptors appear valid";
@@ -97,24 +110,24 @@ namespace asio401 {
 	}
 
 	void QA401::WritePipe(UCHAR pipeId, const void* data, size_t size) {
-		Log() << "Writing " << size << " bytes to pipe " << int(pipeId);
+		Log() << "Writing " << size << " bytes to pipe " << GetPipeIdString(pipeId);
 		ULONG lengthTransferred = 0;
 		if (WinUsb_WritePipe(winUsb.InterfaceHandle(), pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
-			throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to pipe " + std::to_string(int(pipeId)) + GetWindowsErrorString(GetLastError()));
+			throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to pipe " + GetPipeIdString(pipeId) + GetWindowsErrorString(GetLastError()));
 		}
 		if (lengthTransferred != size) {
-			throw std::runtime_error("Unable to write more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " to pipe " + std::to_string(int(pipeId)));
+			throw std::runtime_error("Unable to write more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " to pipe " + GetPipeIdString(pipeId));
 		}
 	}
 
 	void QA401::ReadPipe(UCHAR pipeId, void* data, size_t size) {
-		Log() << "Reading " << size << " bytes from pipe " << int(pipeId);
+		Log() << "Reading " << size << " bytes from pipe " << GetPipeIdString(pipeId);
 		ULONG lengthTransferred = 0;
 		if (WinUsb_ReadPipe(winUsb.InterfaceHandle(), pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
-			throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from pipe " + std::to_string(int(pipeId)) + GetWindowsErrorString(GetLastError()));
+			throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from pipe " + GetPipeIdString(pipeId) + GetWindowsErrorString(GetLastError()));
 		}
 		if (lengthTransferred != size) {
-			throw std::runtime_error("Unable to read more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " from pipe " + std::to_string(int(pipeId)));
+			throw std::runtime_error("Unable to read more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " from pipe " + GetPipeIdString(pipeId));
 		}
 	}
 
