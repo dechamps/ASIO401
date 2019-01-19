@@ -103,30 +103,28 @@ namespace asio401 {
 		}
 
 		void CopyToInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, uint8_t* const interleavedBuffer, const long interleavedBufferChannelCount) {
-			for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount) {
-				for (const auto& bufferInfo : bufferInfos) {
-					if (bufferInfo.isInput) continue;
+			for (const auto& bufferInfo : bufferInfos) {
+				if (bufferInfo.isInput) continue;
 
-					const auto channelNum = bufferInfo.channelNum;
-					assert(channelNum < interleavedBufferChannelCount);
-					const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+				const auto channelNum = bufferInfo.channelNum;
+				assert(channelNum < interleavedBufferChannelCount);
+				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
+				for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount)
 					memcpy(interleavedBuffer + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, buffer + sampleCount * sampleSize, sampleSize);
-				}
 			}
 		}
 
 		void CopyFromInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, const uint8_t* const interleavedBuffer, const long interleavedBufferChannelCount) {
-			for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount) {
-				for (const auto& bufferInfo : bufferInfos) {
-					if (!bufferInfo.isInput) continue;
+			for (const auto& bufferInfo : bufferInfos) {
+				if (!bufferInfo.isInput) continue;
 
-					const auto channelNum = bufferInfo.channelNum;
-					assert(channelNum < interleavedBufferChannelCount);
-					const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+				const auto channelNum = bufferInfo.channelNum;
+				assert(channelNum < interleavedBufferChannelCount);
+				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
+				for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount)
 					memcpy(buffer + sampleCount * sampleSize, interleavedBuffer + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, sampleSize);
-				}
 			}
 		}
 
