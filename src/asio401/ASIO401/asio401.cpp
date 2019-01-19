@@ -349,22 +349,18 @@ namespace asio401 {
 	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
 		std::vector<uint8_t> writeBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
 		std::vector<uint8_t> readBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
-		long our_buffer_index = 0;
+		long driverBufferIndex = 0;
 		Win32HighResolutionTimer win32HighResolutionTimer;
+		// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
+		size_t inputBuffersToSkip = 1;
 		while (!stopRequested) {
-			long locked_buffer_index = (our_buffer_index + 1) % 2;
 			auto currentSamplePosition = samplePosition.load();
-
-			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
-			preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
-			preparedState.asio401.qa401.Read(readBuffer.data(), readBuffer.size());
-			CopyFromInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, locked_buffer_index, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
-
 			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
+			Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 
 			if (!host_supports_timeinfo) {
-				Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << our_buffer_index;
-				preparedState.callbacks.bufferSwitch(long(our_buffer_index), ASIOTrue);
+				Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
+				preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
 				Log() << "bufferSwitch() complete";
 			}
 			else {
@@ -373,14 +369,27 @@ namespace asio401 {
 				time.timeInfo.samplePosition = currentSamplePosition.samples;
 				time.timeInfo.systemTime = currentSamplePosition.timestamp;
 				time.timeInfo.sampleRate = preparedState.sampleRate;
-				Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << our_buffer_index << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
-				const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(our_buffer_index), ASIOTrue);
+				Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
+				const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
 				Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
 			}
+			driverBufferIndex = (driverBufferIndex + 1) % 2;
 
-			std::swap(locked_buffer_index, our_buffer_index);
+			Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
+			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+			preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
+			
+			if (inputBuffersToSkip > 0) {
+				--inputBuffersToSkip;
+			}
+			else {
+				Log() << "Reading from QA401 to buffer index " << driverBufferIndex;
+				preparedState.asio401.qa401.Read(readBuffer.data(), readBuffer.size());
+				CopyFromInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+			}
+			
 			currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
-			Log() << "Updated buffer index: " << our_buffer_index << ", position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << ", timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
+			Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
 		}
 	}
 
