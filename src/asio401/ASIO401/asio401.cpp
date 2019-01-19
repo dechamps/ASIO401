@@ -152,6 +152,7 @@ namespace asio401 {
 		return *devicePath;
 	}()) {
 		Log() << "sysHandle = " << sysHandle;
+		qa401.Reset();
 	}
 
 	void ASIO401::GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity)
@@ -426,6 +427,9 @@ namespace asio401 {
 			currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
 			Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
 		}
+
+		// The QA401 output will exhibit a lingering DC offset if we don't do this.
+		preparedState.asio401.qa401.Reset();
 	}
 
 	void ASIO401::Stop() {

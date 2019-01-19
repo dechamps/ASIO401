@@ -38,7 +38,6 @@ namespace asio401 {
 	QA401::QA401(std::string_view devicePath) :
 		winUsb(WinUsbOpen(devicePath)) {
 		Validate();
-		PrepareDeviceForStreaming();
 	}
 
 	void QA401::Validate() {
@@ -70,8 +69,8 @@ namespace asio401 {
 		Log() << "QA401 descriptors appear valid";
 	}
 
-	void QA401::PrepareDeviceForStreaming() {
-		Log() << "Preparing QA401 device for streaming";
+	void QA401::Reset() {
+		Log() << "Resetting QA401";
 
 		// Black magic incantations provided by QuantAsylum.
 		WriteRegister(4, 1);
@@ -86,7 +85,7 @@ namespace asio401 {
 		WriteRegister(6, 6);
 		WriteRegister(6, 0);
 
-		Log() << "QA401 now ready for streaming";
+		Log() << "QA401 is reset";
 	}
 
 	void QA401::Start() {
