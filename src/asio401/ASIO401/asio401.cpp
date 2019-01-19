@@ -373,7 +373,11 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
-		std::vector<uint8_t> writeBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
+		std::vector<uint8_t> writeBuffer;
+		if (preparedState.buffers.outputChannelCount > 0) {
+			writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
+		}
+		// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
 		std::vector<uint8_t> readBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
 		long driverBufferIndex = 0;
 		Win32HighResolutionTimer win32HighResolutionTimer;
@@ -403,9 +407,11 @@ namespace asio401 {
 			}
 			driverBufferIndex = (driverBufferIndex + 1) % 2;
 
-			Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
-			CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
-			preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
+			if (!writeBuffer.empty()) {
+				Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
+				CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+				preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
+			}
 			
 			if (inputBuffersToSkip > 0) {
 				--inputBuffersToSkip;
