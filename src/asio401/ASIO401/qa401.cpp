@@ -84,6 +84,11 @@ namespace asio401 {
 		Log() << "QA401 is reset";
 	}
 
+	void QA401::SetAttenuator(bool enabled) {
+		// According to QuantAsylum, the attenuator is bit mask 0x02. Also preserve the bits set in Reset().
+		WriteRegister(5, 4 | (enabled ? 0 : 0x02));
+	}
+
 	void QA401::Start() {
 		Log() << "Starting QA401 streaming";
 

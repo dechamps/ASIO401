@@ -11,6 +11,7 @@ namespace asio401 {
 		QA401(std::string_view devicePath);
 
 		void Reset();
+		void SetAttenuator(bool enabled);
 		void Start();
 		void StartWrite(const void* buffer, size_t size);
 		void FinishWrite();

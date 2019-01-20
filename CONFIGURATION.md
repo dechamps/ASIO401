@@ -31,10 +31,37 @@ about what went wrong.
 ## Example configuration file
 
 ```toml
+attenuator = false
 bufferSizeSamples = 512
 ```
 
 ## Options reference
+
+### Option `attenuator`
+
+*Boolean*-typed option that determines if the QA401 hardware attenuator should
+be engaged or not.
+
+If the option is set to `true`, the QA401 attenuator will stay engaged.
+
+If the option is set to `false`, the QA401 attenuator will be bypassed during
+audio streaming.
+
+Note that, contrary to the QuantAsylum Analyzer application, ASIO401 will not
+adjust sample values in any way to account for the presence or absence of the
+attenuator. In other words, defeating the attenuator has the effect of adding
+20 dB to the samples coming from ASIO401.
+
+**CAUTION:** do not apply high voltages to the QA401 inputs while the attenuator
+is bypassed. See the QA401 User Manual for details.
+
+Example:
+
+```toml
+attenuator = false
+```
+
+The default behaviour is to keep the attenuator engaged.
 
 ### Option `bufferSizeSamples`
 
