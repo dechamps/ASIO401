@@ -102,32 +102,6 @@ namespace asio401 {
 			return result;
 		}
 
-		void CopyToInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, uint8_t* const interleavedBuffer, const long interleavedBufferChannelCount) {
-			for (const auto& bufferInfo : bufferInfos) {
-				if (bufferInfo.isInput) continue;
-
-				const auto channelNum = bufferInfo.channelNum;
-				assert(channelNum < interleavedBufferChannelCount);
-				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
-
-				for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount)
-					memcpy(interleavedBuffer + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, buffer + sampleCount * sampleSize, sampleSize);
-			}
-		}
-
-		void CopyFromInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, const uint8_t* const interleavedBuffer, const long interleavedBufferChannelCount) {
-			for (const auto& bufferInfo : bufferInfos) {
-				if (!bufferInfo.isInput) continue;
-
-				const auto channelNum = bufferInfo.channelNum;
-				assert(channelNum < interleavedBufferChannelCount);
-				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
-
-				for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount)
-					memcpy(buffer + sampleCount * sampleSize, interleavedBuffer + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, sampleSize);
-			}
-		}
-
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
 
 		// According to QuantAsylum, QA401 uses 24-bit big-endian integer samples in 32-bit container, left-aligned
@@ -410,7 +384,7 @@ namespace asio401 {
 			if (!writeBuffer.empty()) {
 				Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
 				preparedState.asio401.qa401.FinishWrite();
-				CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+				::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
 				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
 			}
 
@@ -429,7 +403,7 @@ namespace asio401 {
 				}
 
 				preparedState.asio401.qa401.FinishRead();
-				CopyFromInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+				::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true,  preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
 				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
 			}
 			
