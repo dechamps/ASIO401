@@ -107,6 +107,7 @@ namespace asio401 {
 		// According to QuantAsylum, QA401 uses 24-bit big-endian integer samples in 32-bit container, left-aligned
 		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
 		constexpr size_t qa401SampleSize = 4;
+		constexpr size_t qa401HardwareQueueSizeInFrames = 1024;
 
 	}
 
@@ -358,6 +359,7 @@ namespace asio401 {
 		AvrtHighPriority avrtHighPriority;
 		// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
 		size_t inputBuffersToSkip = 1;
+		size_t outputQueueBufferCount = 0;
 		bool started = false;
 		while (!stopRequested) {
 			auto currentSamplePosition = samplePosition.load();
@@ -386,21 +388,23 @@ namespace asio401 {
 				preparedState.asio401.qa401.FinishWrite();
 				::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
 				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
+				if (!started) ++outputQueueBufferCount;
 			}
 
 			preparedState.asio401.qa401.Ping();
+
+			if (!started && outputQueueBufferCount == 2 || outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples > qa401HardwareQueueSizeInFrames) {
+				// If we already have two buffers queued, we can start streaming.
+				// If we have more writes queued that the QA401 can store, we *have* to start streaming, otherwise the next FinishWrite() call will block indefinitely.
+				Log() << "Starting QA401";
+				preparedState.asio401.qa401.Start();
+				started = true;
+			}
 			
 			if (inputBuffersToSkip > 0) {
 				--inputBuffersToSkip;
 			}
 			else {
-				if (!started) {
-					Log() << "Starting QA401";
-					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
-					preparedState.asio401.qa401.Start();
-					started = true;
-				}
-
 				preparedState.asio401.qa401.FinishRead();
 				::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true,  preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
 				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
