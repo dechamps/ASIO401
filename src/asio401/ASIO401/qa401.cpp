@@ -99,7 +99,7 @@ namespace asio401 {
 		Log() << "Writing " << size << " bytes to QA401";
 		WritePipe(writePipeId, buffer, size);
 
-		// Black magic incantation provided by QuantAsylum.
+		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
 		WriteRegister(7, 3);
 	}
 
