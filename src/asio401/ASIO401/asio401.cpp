@@ -397,7 +397,6 @@ namespace asio401 {
 				if (!started) {
 					Log() << "Starting QA401";
 					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
-					preparedState.asio401.qa401.FinishWrite();
 					preparedState.asio401.qa401.Start();
 					started = true;
 				}
