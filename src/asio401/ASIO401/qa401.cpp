@@ -98,14 +98,16 @@ namespace asio401 {
 	void QA401::Write(const void* buffer, size_t size) {
 		Log() << "Writing " << size << " bytes to QA401";
 		WritePipe(writePipeId, buffer, size);
-
-		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
-		WriteRegister(7, 3);
 	}
 
 	void QA401::Read(void* buffer, size_t size) {
 		Log() << "Reading " << size << " bytes from QA401";
 		ReadPipe(readPipeId, buffer, size);
+	}
+
+	void QA401::Ping() {
+		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
+		WriteRegister(7, 3);
 	}
 
 	void QA401::WriteRegister(uint8_t registerNumber, uint32_t value) {

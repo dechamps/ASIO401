@@ -412,6 +412,8 @@ namespace asio401 {
 				CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
 				preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
 			}
+
+			preparedState.asio401.qa401.Ping();
 			
 			if (inputBuffersToSkip > 0) {
 				--inputBuffersToSkip;
