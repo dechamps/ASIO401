@@ -317,7 +317,7 @@ namespace asio401 {
 	void ASIO401::PreparedState::GetLatencies(long* inputLatency, long* outputLatency)
 	{
 		*inputLatency = long(buffers.bufferSizeInSamples);
-		*outputLatency = long(buffers.bufferSizeInSamples);
+		*outputLatency = long(buffers.bufferSizeInSamples) * 2;  // Because we don't support ASIOOutputReady() - see ASIO SDK docs, dechamps_ASIOUtil/BUFFERS.md
 		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
 	}
 
