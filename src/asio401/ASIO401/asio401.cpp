@@ -409,8 +409,9 @@ namespace asio401 {
 
 			if (!writeBuffer.empty()) {
 				Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
+				preparedState.asio401.qa401.FinishWrite();
 				CopyToInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
-				preparedState.asio401.qa401.Write(writeBuffer.data(), writeBuffer.size());
+				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
 			}
 
 			preparedState.asio401.qa401.Ping();
@@ -421,13 +422,15 @@ namespace asio401 {
 			else {
 				if (!started) {
 					Log() << "Starting QA401";
+					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
+					preparedState.asio401.qa401.FinishWrite();
 					preparedState.asio401.qa401.Start();
 					started = true;
 				}
 
-				Log() << "Reading from QA401 to buffer index " << driverBufferIndex;
-				preparedState.asio401.qa401.Read(readBuffer.data(), readBuffer.size());
+				preparedState.asio401.qa401.FinishRead();
 				CopyFromInterleavedBuffer(preparedState.bufferInfos, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
 			}
 			
 			currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);

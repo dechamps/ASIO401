@@ -20,19 +20,6 @@ namespace asio401 {
 
 		const auto requiredPipeIds = { registerPipeId, writePipeId, readPipeId };
 
-		std::string GetPipeIdString(UCHAR pipeId) {
-			std::stringstream result;
-			result.fill('0');
-			result << "Pipe ID 0x" << std::hex << std::setw(2) << int(pipeId) << std::dec << " [";
-			switch (pipeId) {
-			case registerPipeId: result << "register, "; break;
-			case writePipeId: result << "write, "; break;
-			case readPipeId: result << "read, "; break;
-			}
-			result << (pipeId & 0x80 ? "IN" : "OUT") << "]";
-			return result.str();
-		}
-
 	}
 
 	QA401::QA401(std::string_view devicePath) :
@@ -59,11 +46,11 @@ namespace asio401 {
 			if (WinUsb_QueryPipe(winUsb.InterfaceHandle(), 0, endpointIndex, &pipeInformation) != TRUE) {
 				throw std::runtime_error("Unable to query WinUSB pipe #" + std::to_string(int(endpointIndex)) + ": " + GetWindowsErrorString(GetLastError()));
 			}
-			Log() << "Pipe (" << GetPipeIdString(pipeInformation.PipeId) << ") information: " << DescribeWinUsbPipeInformation(pipeInformation);
+			Log() << "Pipe (" << GetUsbPipeIdString(pipeInformation.PipeId) << ") information: " << DescribeWinUsbPipeInformation(pipeInformation);
 			missingPipeIds.erase(pipeInformation.PipeId);
 		}
 		if (!missingPipeIds.empty()) {
-			throw std::runtime_error("Could not find WinUSB pipes: " + ::dechamps_cpputil::Join(missingPipeIds, ", ", GetPipeIdString));
+			throw std::runtime_error("Could not find WinUSB pipes: " + ::dechamps_cpputil::Join(missingPipeIds, ", ", GetUsbPipeIdString));
 		}
 		
 		Log() << "QA401 descriptors appear valid";
@@ -71,6 +58,15 @@ namespace asio401 {
 
 	void QA401::Reset() {
 		Log() << "Resetting QA401";
+
+		for (const auto& pipeId : requiredPipeIds) {
+			WinUsbAbort(winUsb.InterfaceHandle(), pipeId);
+		}
+		for (const auto overlappedIO : { &readIO, &writeIO, &pingIO }) {
+			if (!overlappedIO->has_value()) continue;
+			(*overlappedIO)->Forget();
+			overlappedIO->reset();
+		}
 
 		// Black magic incantations provided by QuantAsylum.
 		WriteRegister(4, 1);
@@ -95,47 +91,45 @@ namespace asio401 {
 		WriteRegister(4, 5);
 	}
 
-	void QA401::Write(const void* buffer, size_t size) {
-		Log() << "Writing " << size << " bytes to QA401";
-		WritePipe(writePipeId, buffer, size);
+	void QA401::StartWrite(const void* buffer, size_t size) {
+		Log() << "Need to write " << size << " bytes to QA401";
+		if (writeIO.has_value()) throw std::runtime_error("Attempted to start a QA401 write while one is already in flight");
+		writeIO = WinUsbWrite(winUsb.InterfaceHandle(), writePipeId, buffer, size, writeOverlapped.getOverlapped());
 	}
 
-	void QA401::Read(void* buffer, size_t size) {
-		Log() << "Reading " << size << " bytes from QA401";
-		ReadPipe(readPipeId, buffer, size);
+	void QA401::FinishWrite() {
+		if (!writeIO.has_value()) return;
+		Log() << "Finishing QA401 write";
+		writeIO.reset();
+	}
+
+	void QA401::StartRead(void* buffer, size_t size) {
+		Log() << "Need to read " << size << " bytes from QA401";
+		if (readIO.has_value()) throw std::runtime_error("Attempted to start a QA401 read while one is already in flight");
+		readIO = WinUsbRead(winUsb.InterfaceHandle(), readPipeId, buffer, size, readOverlapped.getOverlapped());
+	}
+	
+	void QA401::FinishRead() {
+		if (!readIO.has_value()) return;
+		Log() << "Finishing QA401 read";
+		readIO.reset();
 	}
 
 	void QA401::Ping() {
+		if (pingIO.has_value()) pingIO.reset();
 		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
-		WriteRegister(7, 3);
+		pingIO = WriteRegister(7, 3, pingOverlapped.getOverlapped());
 	}
 
 	void QA401::WriteRegister(uint8_t registerNumber, uint32_t value) {
+		WindowsOverlappedEvent overlappedEvent;
+		WriteRegister(registerNumber, value, overlappedEvent.getOverlapped());
+	}
+
+	WinUsbOverlappedIO QA401::WriteRegister(uint8_t registerNumber, uint32_t value, OVERLAPPED& overlapped) {
 		Log() << "Writing " << value << " to QA401 register #" << int(registerNumber);
 		uint8_t request[] = { registerNumber, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value >> 0) };
-		WritePipe(registerPipeId, request, sizeof(request));
-	}
-
-	void QA401::WritePipe(UCHAR pipeId, const void* data, size_t size) {
-		Log() << "Writing " << size << " bytes to pipe " << GetPipeIdString(pipeId);
-		ULONG lengthTransferred = 0;
-		if (WinUsb_WritePipe(winUsb.InterfaceHandle(), pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
-			throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to pipe " + GetPipeIdString(pipeId) + GetWindowsErrorString(GetLastError()));
-		}
-		if (lengthTransferred != size) {
-			throw std::runtime_error("Unable to write more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " to pipe " + GetPipeIdString(pipeId));
-		}
-	}
-
-	void QA401::ReadPipe(UCHAR pipeId, void* data, size_t size) {
-		Log() << "Reading " << size << " bytes from pipe " << GetPipeIdString(pipeId);
-		ULONG lengthTransferred = 0;
-		if (WinUsb_ReadPipe(winUsb.InterfaceHandle(), pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), &lengthTransferred, /*Overlapped=*/NULL) != TRUE) {
-			throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from pipe " + GetPipeIdString(pipeId) + GetWindowsErrorString(GetLastError()));
-		}
-		if (lengthTransferred != size) {
-			throw std::runtime_error("Unable to read more than " + std::to_string(lengthTransferred) + " out of " + std::to_string(size) + " from pipe " + GetPipeIdString(pipeId));
-		}
+		return WinUsbWrite(winUsb.InterfaceHandle(), registerPipeId, request, sizeof(request), overlapped);
 	}
 
 }

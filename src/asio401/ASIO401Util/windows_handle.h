@@ -11,4 +11,15 @@ namespace asio401 {
 	};
 	using WindowsHandleUniquePtr = std::unique_ptr<void, WindowsHandleDeleter>;
 
+	class WindowsOverlappedEvent {
+	public:
+		WindowsOverlappedEvent();
+
+		OVERLAPPED& getOverlapped() { return overlapped; }
+
+	private:
+		const WindowsHandleUniquePtr eventHandle;
+		OVERLAPPED overlapped;
+	};
+
 }
