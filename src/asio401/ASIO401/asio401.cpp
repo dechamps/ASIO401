@@ -108,6 +108,7 @@ namespace asio401 {
 		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
 		constexpr size_t qa401SampleSize = 4;
 		constexpr size_t qa401HardwareQueueSizeInFrames = 1024;
+		constexpr ASIOSampleRate qa401SampleRate = 48000;
 
 	}
 
@@ -186,7 +187,7 @@ namespace asio401 {
 	bool ASIO401::CanSampleRate(ASIOSampleRate sampleRate)
 	{
 		Log() << "Checking for sample rate: " << sampleRate;
-		return true;
+		return sampleRate == qa401SampleRate;
 	}
 
 	void ASIO401::GetSampleRate(ASIOSampleRate* sampleRateResult)
@@ -201,9 +202,7 @@ namespace asio401 {
 	{
 		Log() << "Request to set sample rate: " << requestedSampleRate;
 
-		if (!(requestedSampleRate > 0 && requestedSampleRate < (std::numeric_limits<ASIOSampleRate>::max)())) {
-			throw ASIOException(ASE_InvalidParameter, "setSampleRate() called with an invalid sample rate");
-		}
+		if (!CanSampleRate(requestedSampleRate)) throw ASIOException(ASE_NoClock, "cannot do sample rate " + std::to_string(requestedSampleRate) + " Hz");
 
 		sampleRateWasAccessed = true;
 		previousSampleRate = requestedSampleRate;
