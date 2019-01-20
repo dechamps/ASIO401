@@ -136,8 +136,10 @@ namespace asio401 {
 			*granularity = 0;
 		}
 		else {
-			*minSize = *maxSize = *preferredSize = 512;
-			*granularity = 0;
+			*minSize = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
+			*preferredSize = qa401HardwareQueueSizeInFrames;  // Keeps the QA401 hardware queue filled at all times, good tradeoff between reliability and latency
+			*maxSize = qa401HardwareQueueSizeInFrames;  // Larger buffers have been observed to cause glitches in the input
+			*granularity = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
 		}
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
 	}

@@ -31,7 +31,7 @@ about what went wrong.
 ## Example configuration file
 
 ```toml
-bufferSizeSamples = 480
+bufferSizeSamples = 512
 ```
 
 ## Options reference
@@ -45,10 +45,22 @@ This option can have a major impact on reliability and latency. Smaller buffers
 will reduce latency but will increase the likelihood of glitches/discontinuities
 (buffer overflow/underrun) if the audio pipeline is not fast enough.
 
-Reads and writes to the QA401 happen once per buffer length, and the maximum
-queue size of the QA401 is 1024 samples. For this reason, a buffer size of 1024
-samples or more is unlikely to work well, as the record queue would not be
-drained in time to avoid buffer overflow.
+The QA401 device can store up to 1024 samples in the hardware itself.
+
+On the output (playback) side, ASIO401 will keep two buffers inflight at any
+given time; if the buffer size is larger than half the hardware queue size, the
+excess data is queued on the computer side of the USB connection and is streamed
+progressively as space becomes available in the QA401 hardware queue.
+
+On the input (recording) side, ASIO401 always keeps a read request inflight such
+that the QA401 hardware queue is always being drained, and hopefully stays
+nearly empty at all times.
+
+The best reliability is achieved with a buffer size of 1024 samples; this
+ensures there is always some data queued on the USB host side to keep the QA401
+hardware output queue nearly filled at all times. Smaller buffers only make
+sense if you care about latency. Larger buffers tend to cause discontinuities
+(glitches) in the input direction for some reason.
 
 Note that some host applications might already provide a user-controlled buffer
 size setting; in this case, there should be no need to use this option. It is
@@ -58,11 +70,11 @@ size.
 Example:
 
 ```toml
-bufferSizeSamples = 256 # 5.3 ms at 48 kHz
+bufferSizeSamples = 512 # ~10.7 ms at 48 kHz
 ```
 
 The default behaviour is to advertise minimum, preferred and maximum buffer
-sizes of 512 samples.
+sizes of 64, 1024 and 1024 samples, respectively.
 
 [bufferSizeSamples]: #option-bufferSizeSamples
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file
