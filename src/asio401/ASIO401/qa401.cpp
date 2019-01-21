@@ -68,14 +68,7 @@ namespace asio401 {
 	void QA401::Reset() {
 		Log() << "Resetting QA401";
 
-		for (const auto& pipeId : requiredPipeIds) {
-			WinUsbAbort(winUsb.InterfaceHandle(), pipeId);
-		}
-		for (const auto overlappedIO : { &readIO, &writeIO, &pingIO }) {
-			if (!overlappedIO->has_value()) continue;
-			(*overlappedIO)->Forget();
-			overlappedIO->reset();
-		}
+		AbortIO();
 
 		// Black magic incantations provided by QuantAsylum.
 		WriteRegister(4, 1);
@@ -91,6 +84,19 @@ namespace asio401 {
 		WriteRegister(6, 0);
 
 		Log() << "QA401 is reset";
+	}
+
+	void QA401::AbortIO() {
+		Log() << "Aborting all QA401 I/O";
+
+		for (const auto& pipeId : requiredPipeIds) {
+			WinUsbAbort(winUsb.InterfaceHandle(), pipeId);
+		}
+		for (const auto overlappedIO : { &readIO, &writeIO, &pingIO }) {
+			if (!overlappedIO->has_value()) continue;
+			(*overlappedIO)->Forget();
+			overlappedIO->reset();
+		}
 	}
 
 	void QA401::SetAttenuator(bool enabled) {
@@ -114,6 +120,7 @@ namespace asio401 {
 	void QA401::FinishWrite() {
 		if (!writeIO.has_value()) return;
 		Log() << "Finishing QA401 write";
+		writeIO->Wait();
 		writeIO.reset();
 	}
 
@@ -126,11 +133,15 @@ namespace asio401 {
 	void QA401::FinishRead() {
 		if (!readIO.has_value()) return;
 		Log() << "Finishing QA401 read";
+		readIO->Wait();
 		readIO.reset();
 	}
 
 	void QA401::Ping() {
-		if (pingIO.has_value()) pingIO.reset();
+		if (pingIO.has_value()) {
+			pingIO->Wait();
+			pingIO.reset();
+		}
 
 		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
 		static constexpr RegisterWriteRequest pingRequest(7, 3);
@@ -140,7 +151,7 @@ namespace asio401 {
 	void QA401::WriteRegister(uint8_t registerNumber, uint32_t value) {
 		RegisterWriteRequest registerWriteRequest(registerNumber, value);
 		WindowsOverlappedEvent overlappedEvent;
-		WriteRegister(registerWriteRequest, overlappedEvent.getOverlapped());
+		WriteRegister(registerWriteRequest, overlappedEvent.getOverlapped()).Wait();
 	}
 
 	WinUsbOverlappedIO QA401::WriteRegister(const RegisterWriteRequest& request, OVERLAPPED& overlapped) {

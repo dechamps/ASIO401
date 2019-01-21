@@ -129,9 +129,11 @@ namespace asio401 {
 		state.reset();
 	}
 
-	WinUsbOverlappedIO::~WinUsbOverlappedIO() noexcept(false) {
-		if (!state.has_value()) return;
+	WinUsbOverlappedIO::~WinUsbOverlappedIO() {
+		if (state.has_value()) abort();
+	}
 
+	void WinUsbOverlappedIO::Wait() {
 		Log() << "Waiting for WinUSB overlapped I/O " << &state->overlapped << " to complete";
 		ValidateOverlapped(state->overlapped);
 
@@ -158,6 +160,8 @@ namespace asio401 {
 		}
 
 		Log() << "WinUSB overlapped I/O " << &state->overlapped << " successful";
+
+		state.reset();
 	}
 
 }

@@ -10,6 +10,7 @@ namespace asio401 {
 	class QA401 {
 	public:
 		QA401(std::string_view devicePath);
+		~QA401() { AbortIO(); }
 
 		void Reset();
 		void SetAttenuator(bool enabled);
@@ -39,6 +40,8 @@ namespace asio401 {
 
 		void WriteRegister(uint8_t registerNumber, uint32_t value);
 		WinUsbOverlappedIO WriteRegister(const RegisterWriteRequest& request, OVERLAPPED& overlapped);
+
+		void AbortIO();
 
 		WinUsbHandle winUsb;
 

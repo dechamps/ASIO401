@@ -36,7 +36,7 @@ namespace asio401 {
 	class WinUsbOverlappedIO {
 	public:
 		WinUsbOverlappedIO(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, OVERLAPPED& overlapped, size_t size) : state(std::in_place, winusbInterfaceHandle, overlapped, size) {}
-		~WinUsbOverlappedIO() noexcept(false);
+		~WinUsbOverlappedIO();
 
 		WinUsbOverlappedIO(const WinUsbOverlappedIO&) = delete;
 		WinUsbOverlappedIO(WinUsbOverlappedIO&& other) { *this = std::move(other); }
@@ -47,6 +47,7 @@ namespace asio401 {
 		}
 
 		void Forget();
+		void Wait();
 
 	private:
 		struct State {
