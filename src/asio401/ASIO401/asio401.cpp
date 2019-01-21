@@ -402,7 +402,7 @@ namespace asio401 {
 
 				preparedState.asio401.qa401.Ping();
 
-				if (!started && outputQueueBufferCount == 2 || outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples > qa401HardwareQueueSizeInFrames) {
+				if (!started && (outputQueueBufferCount == 2 || outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples > qa401HardwareQueueSizeInFrames)) {
 					// If we already have two buffers queued, we can start streaming.
 					// If we have more writes queued that the QA401 can store, we *have* to start streaming, otherwise the next FinishWrite() call will block indefinitely.
 					Log() << "Starting QA401";
