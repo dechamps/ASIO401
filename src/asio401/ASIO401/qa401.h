@@ -2,6 +2,7 @@
 
 #include "winusb.h"
 
+#include <array>
 #include <string_view>
 
 namespace asio401 {
@@ -20,10 +21,24 @@ namespace asio401 {
 		void Ping();
 
 	private:
+		class RegisterWriteRequest {
+		public:
+			constexpr RegisterWriteRequest(uint8_t registerNumber, uint32_t value);
+
+			const void* data() const { return request.data(); }
+			size_t size() const { return request.size(); }
+
+			uint8_t getRegisterNumber() const;
+			uint32_t getValue() const;
+
+		private:
+			std::array<uint8_t, 5> request;
+		};
+
 		void Validate();
 
 		void WriteRegister(uint8_t registerNumber, uint32_t value);
-		WinUsbOverlappedIO WriteRegister(uint8_t registerNumber, uint32_t value, OVERLAPPED& overlapped);
+		WinUsbOverlappedIO WriteRegister(const RegisterWriteRequest& request, OVERLAPPED& overlapped);
 
 		WinUsbHandle winUsb;
 

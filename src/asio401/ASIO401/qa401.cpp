@@ -22,6 +22,15 @@ namespace asio401 {
 
 	}
 
+	constexpr QA401::RegisterWriteRequest::RegisterWriteRequest(uint8_t registerNumber, uint32_t value) :
+		request({ registerNumber, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value >> 0) }) {}
+
+	uint8_t QA401::RegisterWriteRequest::getRegisterNumber() const { return request[0]; }
+
+	uint32_t QA401::RegisterWriteRequest::getValue() const {
+		return (request[1] << 24) + (request[2] << 16) + (request[1] << 8) + request[0];
+	}
+
 	QA401::QA401(std::string_view devicePath) :
 		winUsb(WinUsbOpen(devicePath)) {
 		Validate();
@@ -122,19 +131,21 @@ namespace asio401 {
 
 	void QA401::Ping() {
 		if (pingIO.has_value()) pingIO.reset();
+
 		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
-		pingIO = WriteRegister(7, 3, pingOverlapped.getOverlapped());
+		static constexpr RegisterWriteRequest pingRequest(7, 3);
+		pingIO = WriteRegister(pingRequest, pingOverlapped.getOverlapped());
 	}
 
 	void QA401::WriteRegister(uint8_t registerNumber, uint32_t value) {
+		RegisterWriteRequest registerWriteRequest(registerNumber, value);
 		WindowsOverlappedEvent overlappedEvent;
-		WriteRegister(registerNumber, value, overlappedEvent.getOverlapped());
+		WriteRegister(registerWriteRequest, overlappedEvent.getOverlapped());
 	}
 
-	WinUsbOverlappedIO QA401::WriteRegister(uint8_t registerNumber, uint32_t value, OVERLAPPED& overlapped) {
-		Log() << "Writing " << value << " to QA401 register #" << int(registerNumber);
-		uint8_t request[] = { registerNumber, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value >> 0) };
-		return WinUsbWrite(winUsb.InterfaceHandle(), registerPipeId, request, sizeof(request), overlapped);
+	WinUsbOverlappedIO QA401::WriteRegister(const RegisterWriteRequest& request, OVERLAPPED& overlapped) {
+		Log() << "Writing " << request.getValue() << " to QA401 register #" << int(request.getRegisterNumber());
+		return WinUsbWrite(winUsb.InterfaceHandle(), registerPipeId, request.data(), request.size(), overlapped);
 	}
 
 }
