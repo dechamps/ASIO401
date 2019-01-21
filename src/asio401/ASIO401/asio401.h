@@ -112,7 +112,7 @@ namespace asio401 {
 					RunningState*& holder;
 				};
 
-				void RunThread();
+				void RunThread() noexcept;
 
 				PreparedState& preparedState;
 				const bool host_supports_timeinfo;

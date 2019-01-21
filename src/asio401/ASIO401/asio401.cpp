@@ -343,76 +343,108 @@ namespace asio401 {
 		thread.join();
 	}
 
-	void ASIO401::PreparedState::RunningState::RunningState::RunThread() {
+	void ASIO401::PreparedState::RunningState::RunningState::RunThread() noexcept {
+		bool resetRequestIssued = false;
+		auto requestReset = [&]() noexcept {
+			resetRequestIssued = true;
+			try {
+				preparedState.RequestReset();
+			} catch (...) {}
+		};
+
+		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
 		std::vector<uint8_t> writeBuffer;
-		if (preparedState.buffers.outputChannelCount > 0) {
-			writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
+		std::vector<uint8_t> readBuffer;
+
+		try {
+			if (preparedState.buffers.outputChannelCount > 0) {
+				writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
+			}
+			// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
+			readBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
+
+			long driverBufferIndex = 0;
+			Win32HighResolutionTimer win32HighResolutionTimer;
+			AvrtHighPriority avrtHighPriority;
+			// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
+			size_t inputBuffersToSkip = 1;
+			size_t outputQueueBufferCount = 0;
+			bool started = false;
+			while (!stopRequested) {
+				auto currentSamplePosition = samplePosition.load();
+				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
+				Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
+
+				if (!host_supports_timeinfo) {
+					Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
+					preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
+					Log() << "bufferSwitch() complete";
+				}
+				else {
+					ASIOTime time = { 0 };
+					time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
+					time.timeInfo.samplePosition = currentSamplePosition.samples;
+					time.timeInfo.systemTime = currentSamplePosition.timestamp;
+					time.timeInfo.sampleRate = preparedState.sampleRate;
+					Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
+					const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
+					Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
+				}
+				driverBufferIndex = (driverBufferIndex + 1) % 2;
+
+				if (!writeBuffer.empty()) {
+					Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
+					preparedState.asio401.qa401.FinishWrite();
+					::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
+					if (!started) ++outputQueueBufferCount;
+				}
+
+				preparedState.asio401.qa401.Ping();
+
+				if (!started && outputQueueBufferCount == 2 || outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples > qa401HardwareQueueSizeInFrames) {
+					// If we already have two buffers queued, we can start streaming.
+					// If we have more writes queued that the QA401 can store, we *have* to start streaming, otherwise the next FinishWrite() call will block indefinitely.
+					Log() << "Starting QA401";
+					preparedState.asio401.qa401.SetAttenuator(preparedState.asio401.config.attenuator);
+					preparedState.asio401.qa401.Start();
+					started = true;
+				}
+
+				if (inputBuffersToSkip > 0) {
+					--inputBuffersToSkip;
+				}
+				else {
+					preparedState.asio401.qa401.FinishRead();
+					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
+				}
+
+				currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
+				Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
+			}
 		}
-		// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
-		std::vector<uint8_t> readBuffer(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
-		long driverBufferIndex = 0;
-		Win32HighResolutionTimer win32HighResolutionTimer;
-		AvrtHighPriority avrtHighPriority;
-		// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
-		size_t inputBuffersToSkip = 1;
-		size_t outputQueueBufferCount = 0;
-		bool started = false;
-		while (!stopRequested) {
-			auto currentSamplePosition = samplePosition.load();
-			currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
-			Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
-
-			if (!host_supports_timeinfo) {
-				Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
-				preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
-				Log() << "bufferSwitch() complete";
-			}
-			else {
-				ASIOTime time = { 0 };
-				time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
-				time.timeInfo.samplePosition = currentSamplePosition.samples;
-				time.timeInfo.systemTime = currentSamplePosition.timestamp;
-				time.timeInfo.sampleRate = preparedState.sampleRate;
-				Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
-				const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
-				Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
-			}
-			driverBufferIndex = (driverBufferIndex + 1) % 2;
-
-			if (!writeBuffer.empty()) {
-				Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
-				preparedState.asio401.qa401.FinishWrite();
-				::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
-				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
-				if (!started) ++outputQueueBufferCount;
-			}
-
-			preparedState.asio401.qa401.Ping();
-
-			if (!started && outputQueueBufferCount == 2 || outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples > qa401HardwareQueueSizeInFrames) {
-				// If we already have two buffers queued, we can start streaming.
-				// If we have more writes queued that the QA401 can store, we *have* to start streaming, otherwise the next FinishWrite() call will block indefinitely.
-				Log() << "Starting QA401";
-				preparedState.asio401.qa401.SetAttenuator(preparedState.asio401.config.attenuator);
-				preparedState.asio401.qa401.Start();
-				started = true;
-			}
-			
-			if (inputBuffersToSkip > 0) {
-				--inputBuffersToSkip;
-			}
-			else {
-				preparedState.asio401.qa401.FinishRead();
-				::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true,  preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
-				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
-			}
-			
-			currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
-			Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
+		catch (const std::exception& exception) {
+			Log() << "Fatal error occurred in streaming thread: " << exception.what();
+			requestReset();
+		}
+		catch (...) {
+			Log() << "Unknown fatal error occurred in streaming thread";
+			requestReset();
 		}
 
-		// The QA401 output will exhibit a lingering DC offset if we don't do this.
-		preparedState.asio401.qa401.Reset();
+		try {
+			// The QA401 output will exhibit a lingering DC offset if we don't do this.
+			preparedState.asio401.qa401.Reset();
+		}
+		catch (const std::exception& exception) {
+			Log() << "Fatal error occurred while attempting to reset the QA401: " << exception.what();
+			requestReset();
+		}
+		catch (...) {
+			Log() << "Unknown fatal error occurred while attempting to reset the QA401";
+			requestReset();
+		}
 	}
 
 	void ASIO401::Stop() {
