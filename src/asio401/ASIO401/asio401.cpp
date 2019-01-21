@@ -152,15 +152,6 @@ namespace asio401 {
 		Log() << "Returning " << *numInputChannels << " input channels and " << *numOutputChannels << " output channels";
 	}
 
-	namespace {
-		std::string getChannelName(size_t channel)
-		{
-			std::stringstream channel_name;
-			channel_name << channel;
-			return channel_name.str();
-		}
-	}
-
 	void ASIO401::GetChannelInfo(ASIOChannelInfo* info)
 	{
 		Log() << "CASIO401::getChannelInfo()";
@@ -179,7 +170,11 @@ namespace asio401 {
 		info->channelGroup = 0;
 		info->type = qa401SampleType;
 		std::stringstream channel_string;
-		channel_string << (info->isInput ? "IN" : "OUT") << " " << getChannelName(info->channel);
+		channel_string << (info->isInput ? "IN" : "OUT") << " " << info->channel;
+		switch (info->channel) {
+		case 0: channel_string << " Left"; break;
+		case 1: channel_string << " Right"; break;
+		}
 		strcpy_s(info->name, 32, channel_string.str().c_str());
 		Log() << "Returning: " << info->name << ", " << (info->isActive ? "active" : "inactive") << ", group " << info->channelGroup << ", type " << ::dechamps_ASIOUtil::GetASIOSampleTypeString(info->type);
 	}
