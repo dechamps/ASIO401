@@ -139,7 +139,7 @@ namespace asio401 {
 		else {
 			*minSize = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
 			*preferredSize = qa401HardwareQueueSizeInFrames;  // Keeps the QA401 hardware queue filled at all times, good tradeoff between reliability and latency
-			*maxSize = qa401HardwareQueueSizeInFrames;  // Larger buffers have been observed to cause glitches in the input
+			*maxSize = 32768;  // Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
 			*granularity = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
 		}
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
@@ -367,7 +367,6 @@ namespace asio401 {
 			Win32HighResolutionTimer win32HighResolutionTimer;
 			AvrtHighPriority avrtHighPriority;
 			// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
-			size_t inputBuffersToSkip = 1;
 			size_t outputQueueBufferCount = 0;
 			bool started = false;
 			while (!stopRequested) {
@@ -402,22 +401,34 @@ namespace asio401 {
 
 				preparedState.asio401.qa401.Ping();
 
-				if (!started && (outputQueueBufferCount == 2 || outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples > qa401HardwareQueueSizeInFrames)) {
-					// If we already have two buffers queued, we can start streaming.
-					// If we have more writes queued that the QA401 can store, we *have* to start streaming, otherwise the next FinishWrite() call will block indefinitely.
+				preparedState.asio401.qa401.FinishRead();
+				::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+				
+				size_t readSizeInFrames = 0;
+				if (started || outputQueueBufferCount >= 2) {
+					// If we haven't started streaming, we can now.
+					// We wait for a full buffer length to be recorded, then issue another write to feed the output queue.
+					readSizeInFrames = preparedState.buffers.bufferSizeInSamples;
+				} else {
+					const size_t outputQueueFrameCount = outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples;
+					if (outputQueueFrameCount > qa401HardwareQueueSizeInFrames) {
+						// We *have* to start streaming, otherwise we will wait indefinitely for the current write to finish.
+						// However, we also have to keep the input drained while we wait for the first write to complete.
+						// See https://github.com/dechamps/ASIO401/issues/3 for details.
+						readSizeInFrames = outputQueueFrameCount - qa401HardwareQueueSizeInFrames;
+					}
+				}
+				if (readSizeInFrames > 0) {
+					const size_t readSizeInBytes = readSizeInFrames * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
+					Log() << "Reading " << readSizeInFrames << " frames (" << readSizeInBytes << " bytes) from QA401";
+					preparedState.asio401.qa401.StartRead(readBuffer.data() + readBuffer.size() - readSizeInBytes, readSizeInBytes);
+				}
+
+				if (!started && readSizeInFrames > 0) {
 					Log() << "Starting QA401";
 					preparedState.asio401.qa401.SetAttenuator(preparedState.asio401.config.attenuator);
 					preparedState.asio401.qa401.Start();
 					started = true;
-				}
-
-				if (inputBuffersToSkip > 0) {
-					--inputBuffersToSkip;
-				}
-				else {
-					preparedState.asio401.qa401.FinishRead();
-					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
-					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBuffer.size());
 				}
 
 				currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
