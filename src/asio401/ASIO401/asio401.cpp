@@ -104,11 +104,7 @@ namespace asio401 {
 
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
 
-		// According to QuantAsylum, QA401 uses 24-bit big-endian integer samples in 32-bit container, left-aligned
 		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
-		constexpr size_t qa401SampleSize = 4;
-		constexpr size_t qa401HardwareQueueSizeInFrames = 1024;
-		constexpr ASIOSampleRate qa401SampleRate = 48000;
 
 	}
 
@@ -138,7 +134,7 @@ namespace asio401 {
 		}
 		else {
 			*minSize = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
-			*preferredSize = qa401HardwareQueueSizeInFrames;  // Keeps the QA401 hardware queue filled at all times, good tradeoff between reliability and latency
+			*preferredSize = qa401.hardwareQueueSizeInFrames;  // Keeps the QA401 hardware queue filled at all times, good tradeoff between reliability and latency
 			*maxSize = 32768;  // Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
 			*granularity = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
 		}
@@ -182,7 +178,7 @@ namespace asio401 {
 	bool ASIO401::CanSampleRate(ASIOSampleRate sampleRate)
 	{
 		Log() << "Checking for sample rate: " << sampleRate;
-		return sampleRate == qa401SampleRate;
+		return sampleRate == qa401.sampleRate;
 	}
 
 	void ASIO401::GetSampleRate(ASIOSampleRate* sampleRateResult)
@@ -252,7 +248,7 @@ namespace asio401 {
 		buffers(
 			2,
 			GetBufferInfosChannelCount(asioBufferInfos, numChannels, true), GetBufferInfosChannelCount(asioBufferInfos, numChannels, false),
-			bufferSizeInSamples, qa401SampleSize, qa401SampleSize),
+			bufferSizeInSamples, asio401.qa401.sampleSizeInBytes, asio401.qa401.sampleSizeInBytes),
 		bufferInfos([&] {
 		std::vector<ASIOBufferInfo> bufferInfos;
 		bufferInfos.reserve(numChannels);
@@ -411,11 +407,11 @@ namespace asio401 {
 					readSizeInFrames = preparedState.buffers.bufferSizeInSamples;
 				} else {
 					const size_t outputQueueFrameCount = outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples;
-					if (outputQueueFrameCount > qa401HardwareQueueSizeInFrames) {
+					if (outputQueueFrameCount > preparedState.asio401.qa401.hardwareQueueSizeInFrames) {
 						// We *have* to start streaming, otherwise we will wait indefinitely for the current write to finish.
 						// However, we also have to keep the input drained while we wait for the first write to complete.
 						// See https://github.com/dechamps/ASIO401/issues/3 for details.
-						readSizeInFrames = outputQueueFrameCount - qa401HardwareQueueSizeInFrames;
+						readSizeInFrames = outputQueueFrameCount - preparedState.asio401.qa401.hardwareQueueSizeInFrames;
 					}
 				}
 				if (readSizeInFrames > 0) {

@@ -137,8 +137,8 @@ namespace asio401 {
 			std::optional<RunningState> ownedRunningState;
 		};
 
-		int GetInputChannelCount() const { return 2; }
-		int GetOutputChannelCount() const { return 2; }
+		int GetInputChannelCount() const { return qa401.inputChannelCount; }
+		int GetOutputChannelCount() const { return qa401.outputChannelCount; }
 		const HWND windowHandle = nullptr;
 		const Config config;
 		QA401 qa401;
