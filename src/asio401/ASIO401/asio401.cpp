@@ -14,6 +14,7 @@
 #include <avrt.h>
 
 #include <dechamps_cpputil/endian.h>
+#include <dechamps_cpputil/find.h>
 #include <dechamps_cpputil/string.h>
 
 #include <dechamps_ASIOUtil/asio.h>
@@ -106,6 +107,18 @@ namespace asio401 {
 
 		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
 
+		std::optional<QA401::SampleRate> GetQA401SampleRate(ASIOSampleRate sampleRate) {
+			return ::dechamps_cpputil::Find(sampleRate, std::initializer_list<std::pair<ASIOSampleType, QA401::SampleRate>>{
+				{48000, QA401::SampleRate::KHZ48},
+				{192000, QA401::SampleRate::KHZ192}
+			});
+		}
+
+		constexpr std::pair<ASIOSampleRate, QA401::SampleRate> supportedSampleRates[] = {
+			{48000, QA401::SampleRate::KHZ48},
+			{192000, QA401::SampleRate::KHZ192},
+		};
+
 	}
 
 	ASIO401::ASIO401(void* sysHandle) :
@@ -177,7 +190,7 @@ namespace asio401 {
 	bool ASIO401::CanSampleRate(ASIOSampleRate sampleRate)
 	{
 		Log() << "Checking for sample rate: " << sampleRate;
-		return sampleRate == qa401.sampleRate;
+		return GetQA401SampleRate(sampleRate).has_value();
 	}
 
 	void ASIO401::GetSampleRate(ASIOSampleRate* sampleRateResult)
@@ -203,7 +216,7 @@ namespace asio401 {
 		}
 
 		sampleRate = requestedSampleRate;
-		if (preparedState.has_value())
+		if (preparedState.has_value() && preparedState->IsRunning())
 		{
 			Log() << "Sending a reset request to the host as it's not possible to change sample rate while streaming";
 			preparedState->RequestReset();
@@ -224,7 +237,7 @@ namespace asio401 {
 			Log() << "WARNING: ASIO host application never enquired about sample rate, and therefore cannot know we are running at " << sampleRate << " Hz!";
 		}
 
-		preparedState.emplace(*this, sampleRate, bufferInfos, numChannels, bufferSize, callbacks);
+		preparedState.emplace(*this, bufferInfos, numChannels, bufferSize, callbacks);
 	}
 
 	ASIO401::PreparedState::Buffers::Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInSamples, size_t inputSampleSize, size_t outputSampleSize) :
@@ -242,8 +255,8 @@ namespace asio401 {
 		Log() << "Destroying buffers";
 	}
 
-	ASIO401::PreparedState::PreparedState(ASIO401& asio401, ASIOSampleRate sampleRate, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInSamples, ASIOCallbacks* callbacks) :
-		asio401(asio401), sampleRate(sampleRate), callbacks(*callbacks),
+	ASIO401::PreparedState::PreparedState(ASIO401& asio401, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInSamples, ASIOCallbacks* callbacks) :
+		asio401(asio401), callbacks(*callbacks),
 		buffers(
 			2,
 			GetBufferInfosChannelCount(asioBufferInfos, numChannels, true), GetBufferInfosChannelCount(asioBufferInfos, numChannels, false),
@@ -323,6 +336,7 @@ namespace asio401 {
 
 	ASIO401::PreparedState::RunningState::RunningState(PreparedState& preparedState) :
 		preparedState(preparedState),
+		sampleRate(preparedState.asio401.sampleRate),
 		host_supports_timeinfo([&] {
 		Log() << "Checking if the host supports time info";
 		const bool result = preparedState.callbacks.asioMessage &&
@@ -347,12 +361,14 @@ namespace asio401 {
 			} catch (...) {}
 		};
 
+		const auto qa401SampleRate = *GetQA401SampleRate(sampleRate);
+
 		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
 		std::vector<uint8_t> writeBuffer;
 		std::vector<uint8_t> readBuffer;
 
 		try {
-			preparedState.asio401.qa401.Reset(preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED);
+			preparedState.asio401.qa401.Reset(preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED, qa401SampleRate);
 
 			writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
 			readBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
@@ -378,7 +394,7 @@ namespace asio401 {
 					time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
 					time.timeInfo.samplePosition = currentSamplePosition.samples;
 					time.timeInfo.systemTime = currentSamplePosition.timestamp;
-					time.timeInfo.sampleRate = preparedState.sampleRate;
+					time.timeInfo.sampleRate = sampleRate;
 					Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
 					const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
 					Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
@@ -439,7 +455,7 @@ namespace asio401 {
 
 		try {
 			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
-			preparedState.asio401.qa401.Reset(QA401::AttenuatorState::ENGAGED);
+			preparedState.asio401.qa401.Reset(QA401::AttenuatorState::ENGAGED, qa401SampleRate);
 		}
 		catch (const std::exception& exception) {
 			Log() << "Fatal error occurred while attempting to reset the QA401: " << exception.what();

@@ -49,10 +49,11 @@ namespace asio401 {
 	private:
 		class PreparedState {
 		public:
-			PreparedState(ASIO401& asio401, ASIOSampleRate sampleRate, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInSamples, ASIOCallbacks* callbacks);
+			PreparedState(ASIO401& asio401, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInSamples, ASIOCallbacks* callbacks);
 			PreparedState(const PreparedState&) = delete;
 			PreparedState(PreparedState&&) = delete;
 
+			bool IsRunning() const { return runningState != nullptr; }
 			bool IsChannelActive(bool isInput, long channel) const;
 
 			void GetLatencies(long* inputLatency, long* outputLatency);
@@ -115,6 +116,7 @@ namespace asio401 {
 				void RunThread() noexcept;
 
 				PreparedState& preparedState;
+				const ASIOSampleRate sampleRate;
 				const bool host_supports_timeinfo;
 				std::atomic<bool> stopRequested = false;
 				std::atomic<SamplePosition> samplePosition;
@@ -124,9 +126,8 @@ namespace asio401 {
 			};
 
 			ASIO401& asio401;
-			const ASIOSampleRate sampleRate;
+			
 			const ASIOCallbacks callbacks;
-
 			Buffers buffers;
 			const std::vector<ASIOBufferInfo> bufferInfos;
 

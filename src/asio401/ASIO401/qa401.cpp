@@ -65,8 +65,8 @@ namespace asio401 {
 		Log() << "QA401 descriptors appear valid";
 	}
 
-	void QA401::Reset(AttenuatorState attenuatorState) {
-		Log() << "Resetting QA401";
+	void QA401::Reset(AttenuatorState attenuatorState, SampleRate sampleRate) {
+		Log() << "Resetting QA401 with attenuator " << (attenuatorState == AttenuatorState::DISENGAGED ? "disengaged" : "engaged") << " and sample rate " << (sampleRate == SampleRate::KHZ48 ? "48 kHz" : "192 kHz");
 
 		AbortIO();
 
@@ -77,7 +77,11 @@ namespace asio401 {
 		WriteRegister(4, 1);
 		WriteRegister(4, 3);
 		WriteRegister(4, 0);
-		WriteRegister(5, 4 | (attenuatorState == AttenuatorState::DISENGAGED ? 0x02 : 0));
+		// Note: according to QuantAsylum these parameters can be changed at any time, except the sample rate, which can only be changed on reset.
+		WriteRegister(5, 
+			(attenuatorState == AttenuatorState::DISENGAGED ? 0x02 : 0) |
+			(sampleRate == SampleRate::KHZ48 ? 0x04 : 0)
+		);
 		WriteRegister(6, 4);
 		::Sleep(10);
 		WriteRegister(6, 6);
