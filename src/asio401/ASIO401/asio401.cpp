@@ -145,10 +145,18 @@ namespace asio401 {
 			*granularity = 0;
 		}
 		else {
-			*minSize = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
-			*preferredSize = qa401.hardwareQueueSizeInFrames;  // Keeps the QA401 hardware queue filled at all times, good tradeoff between reliability and latency
-			*maxSize = 32768;  // Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
-			*granularity = 64;  // Mostly arbitrary; based on the size of a single USB bulk transfer packet
+			// Mostly arbitrary; based on the size of a single USB bulk transfer packet
+			*minSize = 64;
+
+			// At 48 kHz, keep the QA401 hardware queue filled at all times; good tradeoff between reliability and latency
+			// Above 48 kHz, increase the suggested buffer size proportionally in an attempt to alleviate scheduling/processing timing constraints
+			*preferredSize = long(qa401.hardwareQueueSizeInFrames * (std::max)(sampleRate / 48000, 1.0));
+
+			// Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
+			*maxSize = 32768;
+
+			// Mostly arbitrary; based on the size of a single USB bulk transfer packet
+			*granularity = 64;
 		}
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
 	}

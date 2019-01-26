@@ -84,12 +84,16 @@ On the input (recording) side, ASIO401 always keeps a read request inflight such
 that the QA401 hardware queue is always being drained, and hopefully stays
 nearly empty at all times.
 
-The best tradeoff between reliability and latency is likely to be 1024 samples;
-this ensures there is always some data queued on the USB host side to keep the
-QA401 hardware output queue nearly filled at all times. Smaller buffers only
-make sense if you care about latency. Larger buffers will always improve
-reliability and efficiency by relaxing scheduling constraints and allowing for
-more data to be preloaded, but come with diminishing returns.
+At 48 kHz, the best tradeoff between reliability and latency is likely to be
+1024 samples; this ensures there is always some data queued on the USB host side
+to keep the QA401 hardware output queue nearly filled at all times. Smaller
+buffers only make sense if you care about latency. Larger buffers will always
+improve reliability and efficiency by relaxing scheduling constraints and
+allowing for more data to be preloaded, but come with diminishing returns.
+
+At 192 kHz, it is recommended to use a larger buffer size because 1024 samples
+implies a ~5 ms buffer processing deadline, which is likely too tight for most
+systems, resulting in discontinuities (glitches).
 
 Note that some host applications might already provide a user-controlled buffer
 size setting; in this case, there should be no need to use this option. It is
@@ -103,7 +107,8 @@ bufferSizeSamples = 512 # ~10.7 ms at 48 kHz
 ```
 
 The default behaviour is to advertise minimum, preferred and maximum buffer
-sizes of 64, 1024 and 32768 samples, respectively.
+sizes of 64, 1024 and 32768 samples, respectively. If the application selects
+a 192 kHz sample rate, the preferred buffer size becomes 4096 samples.
 
 [bufferSizeSamples]: #option-bufferSizeSamples
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file
