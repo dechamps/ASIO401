@@ -9,6 +9,8 @@ namespace asio401 {
 
 	class QA401 {
 	public:
+		enum class AttenuatorState { ENGAGED, DISENGAGED };
+
 		static constexpr auto sampleSizeInBytes = 4;  // 32-bit big endian signed integer. According to QuantAsylum the actual precision is 24 bits.
 		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
 		static constexpr auto sampleRate = 48000;
@@ -18,8 +20,7 @@ namespace asio401 {
 		QA401(std::string_view devicePath);
 		~QA401() { AbortIO(); }
 
-		void Reset();
-		void SetAttenuator(bool enabled);
+		void Reset(AttenuatorState attenuatorState);
 		void Start();
 		void StartWrite(const void* buffer, size_t size);
 		void FinishWrite();

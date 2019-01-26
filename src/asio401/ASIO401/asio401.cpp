@@ -122,7 +122,6 @@ namespace asio401 {
 		return *devicePath;
 	}()) {
 		Log() << "sysHandle = " << sysHandle;
-		qa401.Reset();
 	}
 
 	void ASIO401::GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity)
@@ -353,6 +352,8 @@ namespace asio401 {
 		std::vector<uint8_t> readBuffer;
 
 		try {
+			preparedState.asio401.qa401.Reset(preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED);
+
 			writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
 			readBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
 
@@ -419,7 +420,6 @@ namespace asio401 {
 
 				if (!started && readSizeInFrames > 0) {
 					Log() << "Starting QA401";
-					preparedState.asio401.qa401.SetAttenuator(preparedState.asio401.config.attenuator);
 					preparedState.asio401.qa401.Start();
 					started = true;
 				}
@@ -438,8 +438,8 @@ namespace asio401 {
 		}
 
 		try {
-			// The QA401 output will exhibit a lingering DC offset if we don't do this.
-			preparedState.asio401.qa401.Reset();
+			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
+			preparedState.asio401.qa401.Reset(QA401::AttenuatorState::ENGAGED);
 		}
 		catch (const std::exception& exception) {
 			Log() << "Fatal error occurred while attempting to reset the QA401: " << exception.what();

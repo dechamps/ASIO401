@@ -65,7 +65,7 @@ namespace asio401 {
 		Log() << "QA401 descriptors appear valid";
 	}
 
-	void QA401::Reset() {
+	void QA401::Reset(AttenuatorState attenuatorState) {
 		Log() << "Resetting QA401";
 
 		AbortIO();
@@ -77,7 +77,7 @@ namespace asio401 {
 		WriteRegister(4, 1);
 		WriteRegister(4, 3);
 		WriteRegister(4, 0);
-		WriteRegister(5, 4);
+		WriteRegister(5, 4 | (attenuatorState == AttenuatorState::DISENGAGED ? 0x02 : 0));
 		WriteRegister(6, 4);
 		::Sleep(10);
 		WriteRegister(6, 6);
@@ -113,11 +113,6 @@ namespace asio401 {
 			(*overlappedIO)->Forget();
 			overlappedIO->reset();
 		}
-	}
-
-	void QA401::SetAttenuator(bool enabled) {
-		// According to QuantAsylum, the attenuator is bit mask 0x02. Also preserve the bits set in Reset().
-		WriteRegister(5, 4 | (enabled ? 0 : 0x02));
 	}
 
 	void QA401::Start() {
