@@ -387,11 +387,12 @@ namespace asio401 {
 			// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
 			size_t outputQueueBufferCount = 0;
 			bool started = false;
+			SamplePosition currentSamplePosition;
 			while (!stopRequested) {
-				auto currentSamplePosition = samplePosition.load();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 				if (IsLoggingEnabled()) Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
-
+				
+				samplePosition = currentSamplePosition;
 				if (!host_supports_timeinfo) {
 					if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
 					preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
