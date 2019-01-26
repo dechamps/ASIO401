@@ -353,10 +353,7 @@ namespace asio401 {
 		std::vector<uint8_t> readBuffer;
 
 		try {
-			if (preparedState.buffers.outputChannelCount > 0) {
-				writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
-			}
-			// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
+			writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
 			readBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
 
 			long driverBufferIndex = 0;
@@ -387,13 +384,12 @@ namespace asio401 {
 				}
 				driverBufferIndex = (driverBufferIndex + 1) % 2;
 
-				if (!writeBuffer.empty()) {
-					Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
-					preparedState.asio401.qa401.FinishWrite();
-					::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
-					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
-					if (!started) ++outputQueueBufferCount;
-				}
+				Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
+				preparedState.asio401.qa401.FinishWrite();
+				// Note that we always write even if no output channels are specified, because the QA401 will refuse to stream otherwise. See https://github.com/dechamps/ASIO401/issues/10
+				::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
+				if (!started) ++outputQueueBufferCount;
 
 				preparedState.asio401.qa401.Ping();
 
@@ -416,6 +412,7 @@ namespace asio401 {
 				}
 				if (readSizeInFrames > 0) {
 					const size_t readSizeInBytes = readSizeInFrames * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
+					// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
 					Log() << "Reading " << readSizeInFrames << " frames (" << readSizeInBytes << " bytes) from QA401";
 					preparedState.asio401.qa401.StartRead(readBuffer.data() + readBuffer.size() - readSizeInBytes, readSizeInBytes);
 				}
