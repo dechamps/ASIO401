@@ -94,7 +94,7 @@ namespace asio401 {
 	}
 
 	WinUsbOverlappedIO WinUsbWrite(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, const void* data, size_t size, OVERLAPPED& overlapped) {
-		Log() << "Writing " << size << " bytes to WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << &overlapped;
+		if (IsLoggingEnabled()) Log() << "Writing " << size << " bytes to WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << &overlapped;
 		PrepareOverlapped(overlapped);
 		if (WinUsb_WritePipe(winusbInterfaceHandle, pipeId, reinterpret_cast<PUCHAR>(const_cast<void*>(data)), ULONG(size), /*LengthTransferred=*/NULL, &overlapped) != FALSE || GetLastError() != ERROR_IO_PENDING) {
 			throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to WinUSB pipe " + GetUsbPipeIdString(pipeId) + ": " + GetWindowsErrorString(GetLastError()));
@@ -103,7 +103,7 @@ namespace asio401 {
 	}
 
 	WinUsbOverlappedIO WinUsbRead(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, void* data, size_t size, OVERLAPPED& overlapped) {
-		Log() << "Reading " << size << " bytes from WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << &overlapped;
+		if (IsLoggingEnabled()) Log() << "Reading " << size << " bytes from WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << &overlapped;
 		PrepareOverlapped(overlapped);
 		if (WinUsb_ReadPipe(winusbInterfaceHandle, pipeId, reinterpret_cast<PUCHAR>(data), ULONG(size), /*LengthTransferred=*/NULL, &overlapped) != FALSE || GetLastError() != ERROR_IO_PENDING) {
 			throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from WinUSB pipe " + GetUsbPipeIdString(pipeId) + ": " + GetWindowsErrorString(GetLastError()));
@@ -134,7 +134,7 @@ namespace asio401 {
 	}
 
 	void WinUsbOverlappedIO::Wait() {
-		Log() << "Waiting for WinUSB overlapped I/O " << &state->overlapped << " to complete";
+		if (IsLoggingEnabled()) Log() << "Waiting for WinUSB overlapped I/O " << &state->overlapped << " to complete";
 		ValidateOverlapped(state->overlapped);
 
 		ULONG lengthTransferred = 0;
@@ -159,7 +159,7 @@ namespace asio401 {
 			throw std::runtime_error("Unable to reset event in WinUSB overlapped I/O");
 		}
 
-		Log() << "WinUSB overlapped I/O " << &state->overlapped << " successful";
+		if (IsLoggingEnabled()) Log() << "WinUSB overlapped I/O " << &state->overlapped << " successful";
 
 		state.reset();
 	}

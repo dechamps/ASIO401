@@ -127,27 +127,27 @@ namespace asio401 {
 	}
 
 	void QA401::StartWrite(const void* buffer, size_t size) {
-		Log() << "Need to write " << size << " bytes to QA401";
+		if (IsLoggingEnabled()) Log() << "Need to write " << size << " bytes to QA401";
 		if (writeIO.has_value()) throw std::runtime_error("Attempted to start a QA401 write while one is already in flight");
 		writeIO = WinUsbWrite(winUsb.InterfaceHandle(), writePipeId, buffer, size, writeOverlapped.getOverlapped());
 	}
 
 	void QA401::FinishWrite() {
 		if (!writeIO.has_value()) return;
-		Log() << "Finishing QA401 write";
+		if (IsLoggingEnabled()) Log() << "Finishing QA401 write";
 		writeIO->Wait();
 		writeIO.reset();
 	}
 
 	void QA401::StartRead(void* buffer, size_t size) {
-		Log() << "Need to read " << size << " bytes from QA401";
+		if (IsLoggingEnabled()) Log() << "Need to read " << size << " bytes from QA401";
 		if (readIO.has_value()) throw std::runtime_error("Attempted to start a QA401 read while one is already in flight");
 		readIO = WinUsbRead(winUsb.InterfaceHandle(), readPipeId, buffer, size, readOverlapped.getOverlapped());
 	}
 	
 	void QA401::FinishRead() {
 		if (!readIO.has_value()) return;
-		Log() << "Finishing QA401 read";
+		if (IsLoggingEnabled()) Log() << "Finishing QA401 read";
 		readIO->Wait();
 		readIO.reset();
 	}
@@ -170,7 +170,7 @@ namespace asio401 {
 	}
 
 	WinUsbOverlappedIO QA401::WriteRegister(const RegisterWriteRequest& request, OVERLAPPED& overlapped) {
-		Log() << "Writing " << request.getValue() << " to QA401 register #" << int(request.getRegisterNumber());
+		if (IsLoggingEnabled()) Log() << "Writing " << request.getValue() << " to QA401 register #" << int(request.getRegisterNumber());
 		return WinUsbWrite(winUsb.InterfaceHandle(), registerPipeId, request.data(), request.size(), overlapped);
 	}
 

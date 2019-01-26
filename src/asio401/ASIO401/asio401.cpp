@@ -382,12 +382,12 @@ namespace asio401 {
 			while (!stopRequested) {
 				auto currentSamplePosition = samplePosition.load();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
-				Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
+				if (IsLoggingEnabled()) Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 
 				if (!host_supports_timeinfo) {
-					Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
+					if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
 					preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
-					Log() << "bufferSwitch() complete";
+					if (IsLoggingEnabled()) Log() << "bufferSwitch() complete";
 				}
 				else {
 					ASIOTime time = { 0 };
@@ -395,13 +395,13 @@ namespace asio401 {
 					time.timeInfo.samplePosition = currentSamplePosition.samples;
 					time.timeInfo.systemTime = currentSamplePosition.timestamp;
 					time.timeInfo.sampleRate = sampleRate;
-					Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
+					if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
 					const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
-					Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
+					if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
 				}
 				driverBufferIndex = (driverBufferIndex + 1) % 2;
 
-				Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
+				if (IsLoggingEnabled()) Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
 				preparedState.asio401.qa401.FinishWrite();
 				// Note that we always write even if no output channels are specified, because the QA401 will refuse to stream otherwise. See https://github.com/dechamps/ASIO401/issues/10
 				::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
@@ -430,18 +430,18 @@ namespace asio401 {
 				if (readSizeInFrames > 0) {
 					const size_t readSizeInBytes = readSizeInFrames * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
 					// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
-					Log() << "Reading " << readSizeInFrames << " frames (" << readSizeInBytes << " bytes) from QA401";
+					if (IsLoggingEnabled()) Log() << "Reading " << readSizeInFrames << " frames (" << readSizeInBytes << " bytes) from QA401";
 					preparedState.asio401.qa401.StartRead(readBuffer.data() + readBuffer.size() - readSizeInBytes, readSizeInBytes);
 				}
 
 				if (!started && readSizeInFrames > 0) {
-					Log() << "Starting QA401";
+					if (IsLoggingEnabled()) Log() << "Starting QA401";
 					preparedState.asio401.qa401.Start();
 					started = true;
 				}
 
 				currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
-				Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
+				if (IsLoggingEnabled()) Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
 			}
 		}
 		catch (const std::exception& exception) {
@@ -494,7 +494,7 @@ namespace asio401 {
 		const auto currentSamplePosition = samplePosition.load();
 		*sPos = currentSamplePosition.samples;
 		*tStamp = currentSamplePosition.timestamp;
-		Log() << "Returning: sample position " << ::dechamps_ASIOUtil::ASIOToInt64(*sPos) << ", timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(*tStamp);
+		if (IsLoggingEnabled()) Log() << "Returning: sample position " << ::dechamps_ASIOUtil::ASIOToInt64(*sPos) << ", timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(*tStamp);
 	}
 
 	void ASIO401::PreparedState::RequestReset() {

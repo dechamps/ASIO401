@@ -44,6 +44,7 @@ namespace asio401 {
 
 	}
 
+	bool IsLoggingEnabled() { return ASIO401LogSink::Get() != nullptr;  }
 	::dechamps_cpplog::Logger Log() { return ::dechamps_cpplog::Logger(ASIO401LogSink::Get()); }
 
 }
