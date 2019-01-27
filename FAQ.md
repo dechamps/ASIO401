@@ -37,6 +37,17 @@ A more technical term for these is *discontinuities*. They are often caused by
 *buffer overflows* (input) or *buffer underruns* (output). These in turn have
 two typical causes:
 
+ - **USB performance issues**: contrary to most audio USB devices, the QA401
+   uses bulk, not isochronous, USB transfers, which means it does not reserve
+   USB bandwidth and is therefore prone from interference from other USB devices
+   sharing the same bus.
+   - It is recommended to keep the QA401 on a dedicated USB root all to itself,
+     with no over devices competing for bandwidth and interrupts.
+   - At **192 kHz** the USB timing constraints become quite severe because the
+     QA401 hardware queue is only 1024 samples long, and therefore needs to be
+     refreshed at least once every 5 milliseconds at 192 kHz. This is true even
+     if the ASIO buffer size is larger than 1024 samples. Stick to 48 kHz if you
+     can.
  - **Expensive processing** is being done in the critical real-time audio
    streaming loop, or the ASIO Host Application real-time streaming path is
    poorly optimized, and the pipeline is unable to keep up.
@@ -53,16 +64,6 @@ two typical causes:
      devices (full duplex mode), even if both devices are backed by the same
      hardware. Problems are less likely to occur when using only the input, or
      only the output (half duplex mode).
- - **192 kHz sampling rate comes with extreme USB timing constraints**, and
-   typically requires a highly responsive system as well as a clean,
-   unencumbered USB connection.
-   - This is due to the fact that the QA401 hardware queue is only 1024 samples
-     long, and therefore needs to be refreshed via USB at least once every 5
-     milliseconds at 192 kHz to avoid buffer underrun/overflow. If the deadline
-     is missed, a glitch will result. This is true even if the ASIO buffer size
-     is larger than 1024 samples.
-   - For this reason, it is recommended to avoid running the QA401 at 192 kHz
-     unless you absolutely need to.
  - **[ASIO401 logging][logging] is enabled**.
    - ASIO401 writes to the log using blocking file I/O from critical real-time
      code paths. This can easily lead to missed deadlines, especially with small
