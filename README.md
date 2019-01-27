@@ -34,6 +34,8 @@ Please direct any support requests [to ASIO401][report], not QuantAsylum.
 
 You will need to repeat these steps every time you power cycle the QA401.
 
+To disengage the attenuator, and other options, see [CONFIGURATION][].
+
 ## Troubleshooting
 
 The [FAQ][] provides information on how to deal with common issues. Otherwise,
