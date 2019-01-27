@@ -375,7 +375,7 @@ namespace asio401 {
 		const auto readFrameSizeInBytes = preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
 		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.qa401.hardwareQueueSizeInFrames * readFrameSizeInBytes;
-		const auto writeBufferSizeInBytes = preparedState.buffers.bufferSizeInSamples * writeFrameSizeInBytes;
+		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInSamples * writeFrameSizeInBytes : 0;
 		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInSamples * readFrameSizeInBytes;
 		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
 		std::vector<uint8_t> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
@@ -408,16 +408,18 @@ namespace asio401 {
 			long driverBufferIndex = 0;
 			SamplePosition currentSamplePosition;
 			while (!stopRequested) {
-				// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
-				// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
-				if (!firstIteration) {
-					preparedState.asio401.qa401.FinishWrite();
-					if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
-					::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+				// If no output channels are enabled, then skip writing to increase efficiency and reliability.
+				// Note: we can skip this because we already did a dummy write above, which started the hardware. Otherwise the reads would block forever.
+				if (preparedState.buffers.outputChannelCount > 0) {
+					// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
+					// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
+					if (!firstIteration) {
+						preparedState.asio401.qa401.FinishWrite();
+						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
+						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+					}
+					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
-				// Note that we always write even if no output channels are specified, because the QA401 will refuse to stream otherwise. See https://github.com/dechamps/ASIO401/issues/10
-				// TODO: this is not actually true, especially since we now have an initial write that will start the QA401 anyway, and it will keep streaming afterwards.
-				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				
 				if (!firstIteration) preparedState.asio401.qa401.FinishRead();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
