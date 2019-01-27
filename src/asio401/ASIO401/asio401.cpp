@@ -248,13 +248,13 @@ namespace asio401 {
 		preparedState.emplace(*this, bufferInfos, numChannels, bufferSize, callbacks);
 	}
 
-	ASIO401::PreparedState::Buffers::Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInSamples, size_t inputSampleSize, size_t outputSampleSize) :
-		bufferSetCount(bufferSetCount), inputChannelCount(inputChannelCount), outputChannelCount(outputChannelCount), bufferSizeInSamples(bufferSizeInSamples), inputSampleSize(inputSampleSize), outputSampleSize(outputSampleSize),
-		buffers(bufferSetCount * bufferSizeInSamples * (inputChannelCount * inputSampleSize + outputChannelCount * outputSampleSize)) {
+	ASIO401::PreparedState::Buffers::Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInFrames, size_t inputSampleSize, size_t outputSampleSize) :
+		bufferSetCount(bufferSetCount), inputChannelCount(inputChannelCount), outputChannelCount(outputChannelCount), bufferSizeInFrames(bufferSizeInFrames), inputSampleSize(inputSampleSize), outputSampleSize(outputSampleSize),
+		buffers(bufferSetCount * bufferSizeInFrames * (inputChannelCount * inputSampleSize + outputChannelCount * outputSampleSize)) {
 		Log() << "Allocated "
 			<< bufferSetCount << " buffer sets, "
 			<< inputChannelCount << "/" << outputChannelCount << " (I/O) channels per buffer set, "
-			<< bufferSizeInSamples << " samples per channel, "
+			<< bufferSizeInFrames << " samples per channel, "
 			<< inputSampleSize << "/" << outputSampleSize << " (I/O) bytes per sample, memory range: "
 			<< static_cast<const void*>(buffers.data()) << "-" << static_cast<const void*>(buffers.data() + buffers.size());
 	}
@@ -263,12 +263,12 @@ namespace asio401 {
 		Log() << "Destroying buffers";
 	}
 
-	ASIO401::PreparedState::PreparedState(ASIO401& asio401, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInSamples, ASIOCallbacks* callbacks) :
+	ASIO401::PreparedState::PreparedState(ASIO401& asio401, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInFrames, ASIOCallbacks* callbacks) :
 		asio401(asio401), callbacks(*callbacks),
 		buffers(
 			2,
 			GetBufferInfosChannelCount(asioBufferInfos, numChannels, true), GetBufferInfosChannelCount(asioBufferInfos, numChannels, false),
-			bufferSizeInSamples, asio401.qa401.sampleSizeInBytes, asio401.qa401.sampleSizeInBytes),
+			bufferSizeInFrames, asio401.qa401.sampleSizeInBytes, asio401.qa401.sampleSizeInBytes),
 		bufferInfos([&] {
 		std::vector<ASIOBufferInfo> bufferInfos;
 		bufferInfos.reserve(numChannels);
@@ -326,8 +326,8 @@ namespace asio401 {
 
 	void ASIO401::PreparedState::GetLatencies(long* inputLatency, long* outputLatency)
 	{
-		*inputLatency = long(buffers.bufferSizeInSamples);
-		*outputLatency = long(buffers.bufferSizeInSamples) * 2;  // Because we don't support ASIOOutputReady() - see ASIO SDK docs, dechamps_ASIOUtil/BUFFERS.md
+		*inputLatency = long(buffers.bufferSizeInFrames);
+		*outputLatency = long(buffers.bufferSizeInFrames) * 2;  // Because we don't support ASIOOutputReady() - see ASIO SDK docs, dechamps_ASIOUtil/BUFFERS.md
 		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
 	}
 
@@ -375,8 +375,8 @@ namespace asio401 {
 		const auto readFrameSizeInBytes = preparedState.asio401.qa401.inputChannelCount * preparedState.buffers.inputSampleSize;
 		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.qa401.hardwareQueueSizeInFrames * readFrameSizeInBytes;
-		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInSamples * writeFrameSizeInBytes : 0;
-		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInSamples * readFrameSizeInBytes;
+		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
+		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInFrames * readFrameSizeInBytes;
 		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
 		std::vector<uint8_t> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
 		std::vector<uint8_t> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
@@ -422,7 +422,7 @@ namespace asio401 {
 					if (!firstIteration) {
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
-						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
+						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
 					}
 					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
@@ -430,9 +430,9 @@ namespace asio401 {
 				if (!firstIteration) preparedState.asio401.qa401.FinishRead();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 				if (!firstIteration) {
-					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
+					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 					if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
-					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
+					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
 				}
 				// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
 				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
