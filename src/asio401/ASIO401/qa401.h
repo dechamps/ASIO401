@@ -9,6 +9,7 @@ namespace asio401 {
 
 	class QA401 {
 	public:
+		enum class InputHighPassFilterState { ENGAGED, DISENGAGED };  // See https://github.com/dechamps/ASIO401/issues/7
 		enum class AttenuatorState { ENGAGED, DISENGAGED };
 		enum class SampleRate { KHZ48, KHZ192 };  // According to QuantAsylum, the QA401 only supports these two
 
@@ -24,7 +25,7 @@ namespace asio401 {
 		// Note that there is no Start() call. Technically we could implement one by writing 5 into register 4 but that has rather nasty side effects. See https://github.com/dechamps/ASIO401/issues/9
 		// Instead we do that register write in Reset(), and exploit the fact that the QA401 won't actually start streaming until the first write is sent. See https://github.com/dechamps/ASIO401/issues/10
 
-		void Reset(AttenuatorState attenuatorState, SampleRate sampleRate);
+		void Reset(InputHighPassFilterState inputHighPassFilterState, AttenuatorState attenuatorState, SampleRate sampleRate);
 		void StartWrite(const void* buffer, size_t size);
 		void FinishWrite();
 		void StartRead(void* buffer, size_t size);

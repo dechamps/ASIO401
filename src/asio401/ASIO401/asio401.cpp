@@ -385,8 +385,14 @@ namespace asio401 {
 		// Note: Reset() calls are done under high priority, because the internal timing of the reset procedure is somewhat important to avoid https://github.com/dechamps/ASIO401/issues/9
 		AvrtHighPriority avrtHighPriority;
 
-		try {			
-			preparedState.asio401.qa401.Reset(preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED, qa401SampleRate);
+		try {
+			// Note: the input high pass filter is not configurable, because there's no clear use case for disabling it.
+			// If you can think of one, feel free to reopen https://github.com/dechamps/ASIO401/issues/7.
+			preparedState.asio401.qa401.Reset(
+				QA401::InputHighPassFilterState::ENGAGED,
+				preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED,
+				qa401SampleRate
+			);
 
 			// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
 			// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
@@ -468,7 +474,7 @@ namespace asio401 {
 
 		try {
 			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
-			preparedState.asio401.qa401.Reset(QA401::AttenuatorState::ENGAGED, qa401SampleRate);
+			preparedState.asio401.qa401.Reset(QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, qa401SampleRate);
 		}
 		catch (const std::exception& exception) {
 			Log() << "Fatal error occurred while attempting to reset the QA401: " << exception.what();
