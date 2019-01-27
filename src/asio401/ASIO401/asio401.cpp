@@ -248,14 +248,14 @@ namespace asio401 {
 		preparedState.emplace(*this, bufferInfos, numChannels, bufferSize, callbacks);
 	}
 
-	ASIO401::PreparedState::Buffers::Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInFrames, size_t inputSampleSize, size_t outputSampleSize) :
-		bufferSetCount(bufferSetCount), inputChannelCount(inputChannelCount), outputChannelCount(outputChannelCount), bufferSizeInFrames(bufferSizeInFrames), inputSampleSize(inputSampleSize), outputSampleSize(outputSampleSize),
-		buffers(bufferSetCount * bufferSizeInFrames * (inputChannelCount * inputSampleSize + outputChannelCount * outputSampleSize)) {
+	ASIO401::PreparedState::Buffers::Buffers(size_t bufferSetCount, size_t inputChannelCount, size_t outputChannelCount, size_t bufferSizeInFrames, size_t inputSampleSizeInBytes, size_t outputSampleSizeInBytes) :
+		bufferSetCount(bufferSetCount), inputChannelCount(inputChannelCount), outputChannelCount(outputChannelCount), bufferSizeInFrames(bufferSizeInFrames), inputSampleSizeInBytes(inputSampleSizeInBytes), outputSampleSizeInBytes(outputSampleSizeInBytes),
+		buffers(bufferSetCount * bufferSizeInFrames * (inputChannelCount * inputSampleSizeInBytes + outputChannelCount * outputSampleSizeInBytes)) {
 		Log() << "Allocated "
 			<< bufferSetCount << " buffer sets, "
 			<< inputChannelCount << "/" << outputChannelCount << " (I/O) channels per buffer set, "
 			<< bufferSizeInFrames << " samples per channel, "
-			<< inputSampleSize << "/" << outputSampleSize << " (I/O) bytes per sample, memory range: "
+			<< inputSampleSizeInBytes << "/" << outputSampleSizeInBytes << " (I/O) bytes per sample, memory range: "
 			<< static_cast<const void*>(buffers.data()) << "-" << static_cast<const void*>(buffers.data() + buffers.size());
 	}
 
@@ -371,8 +371,8 @@ namespace asio401 {
 
 		const auto qa401SampleRate = *GetQA401SampleRate(sampleRate);
 
-		const auto writeFrameSizeInBytes = preparedState.asio401.qa401.outputChannelCount * preparedState.buffers.outputSampleSize;
-		const auto readFrameSizeInBytes = preparedState.asio401.qa401.inputChannelCount * preparedState.buffers.inputSampleSize;
+		const auto writeFrameSizeInBytes = preparedState.asio401.qa401.outputChannelCount * preparedState.buffers.outputSampleSizeInBytes;
+		const auto readFrameSizeInBytes = preparedState.asio401.qa401.inputChannelCount * preparedState.buffers.inputSampleSizeInBytes;
 		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.qa401.hardwareQueueSizeInFrames * readFrameSizeInBytes;
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
@@ -422,7 +422,7 @@ namespace asio401 {
 					if (!firstIteration) {
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
-						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
+						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSizeInBytes, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
 					}
 					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
@@ -432,7 +432,7 @@ namespace asio401 {
 				if (!firstIteration) {
 					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 					if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
-					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
+					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSizeInBytes, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
 				}
 				// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
 				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
