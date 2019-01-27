@@ -371,28 +371,69 @@ namespace asio401 {
 
 		const auto qa401SampleRate = *GetQA401SampleRate(sampleRate);
 
+		const auto writeFrameSizeInBytes = preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize;
+		const auto readFrameSizeInBytes = preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
+		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
+		const auto firstReadBufferSizeInBytes = preparedState.asio401.qa401.hardwareQueueSizeInFrames * readFrameSizeInBytes;
+		const auto writeBufferSizeInBytes = preparedState.buffers.bufferSizeInSamples * writeFrameSizeInBytes;
+		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInSamples * readFrameSizeInBytes;
 		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
-		std::vector<uint8_t> writeBuffer;
-		std::vector<uint8_t> readBuffer;
+		std::vector<uint8_t> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
+		std::vector<uint8_t> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
 
-		try {
+		Win32HighResolutionTimer win32HighResolutionTimer;
+		// Note: Reset() calls are done under high priority, because the internal timing of the reset procedure is somewhat important to avoid https://github.com/dechamps/ASIO401/issues/9
+		AvrtHighPriority avrtHighPriority;
+
+		try {			
 			preparedState.asio401.qa401.Reset(preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED, qa401SampleRate);
 
-			writeBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize);
-			readBuffer.resize(preparedState.buffers.bufferSizeInSamples * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize);
+			// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
+			// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
+			// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
+			//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
+			//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
+			preparedState.asio401.qa401.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+			// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
+			// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
+			// Starting streaming that way as a few interesting consequences:
+			//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
+			//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
+			preparedState.asio401.qa401.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+			preparedState.asio401.qa401.FinishWrite();
+			preparedState.asio401.qa401.FinishRead();
 
-			long driverBufferIndex = 0;
-			Win32HighResolutionTimer win32HighResolutionTimer;
-			AvrtHighPriority avrtHighPriority;
 			// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
-			size_t outputQueueBufferCount = 0;
-			bool started = false;
+			bool firstIteration = true;
+			long driverBufferIndex = 0;
 			SamplePosition currentSamplePosition;
 			while (!stopRequested) {
-				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
-				if (IsLoggingEnabled()) Log() << "Updated current timestamp: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
+				// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
+				// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
+				if (!firstIteration) {
+					preparedState.asio401.qa401.FinishWrite();
+					if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
+					::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+				}
+				// Note that we always write even if no output channels are specified, because the QA401 will refuse to stream otherwise. See https://github.com/dechamps/ASIO401/issues/10
+				// TODO: this is not actually true, especially since we now have an initial write that will start the QA401 anyway, and it will keep streaming afterwards.
+				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				
+				if (!firstIteration) preparedState.asio401.qa401.FinishRead();
+				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
+				if (!firstIteration) {
+					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
+					if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
+					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+				}
+				// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
+				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
+				if (IsLoggingEnabled()) Log() << "Reading from QA401";
+				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
+				
+				if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 				samplePosition = currentSamplePosition;
+
 				if (!host_supports_timeinfo) {
 					if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
 					preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
@@ -408,49 +449,10 @@ namespace asio401 {
 					const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
 					if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
 				}
+
 				driverBufferIndex = (driverBufferIndex + 1) % 2;
-
-				if (IsLoggingEnabled()) Log() << "Writing to QA401 from buffer index " << driverBufferIndex;
-				preparedState.asio401.qa401.FinishWrite();
-				// Note that we always write even if no output channels are specified, because the QA401 will refuse to stream otherwise. See https://github.com/dechamps/ASIO401/issues/10
-				::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
-				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBuffer.size());
-				if (!started) ++outputQueueBufferCount;
-
 				preparedState.asio401.qa401.Ping();
-
-				preparedState.asio401.qa401.FinishRead();
-				::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
-				
-				size_t readSizeInFrames = 0;
-				if (started || outputQueueBufferCount >= 2) {
-					// If we haven't started streaming, we can now.
-					// We wait for a full buffer length to be recorded, then issue another write to feed the output queue.
-					readSizeInFrames = preparedState.buffers.bufferSizeInSamples;
-				} else {
-					const size_t outputQueueFrameCount = outputQueueBufferCount * preparedState.buffers.bufferSizeInSamples;
-					if (outputQueueFrameCount > preparedState.asio401.qa401.hardwareQueueSizeInFrames) {
-						// We *have* to start streaming, otherwise we will wait indefinitely for the current write to finish.
-						// However, we also have to keep the input drained while we wait for the first write to complete.
-						// See https://github.com/dechamps/ASIO401/issues/3 for details.
-						readSizeInFrames = outputQueueFrameCount - preparedState.asio401.qa401.hardwareQueueSizeInFrames;
-					}
-				}
-				if (readSizeInFrames > 0) {
-					const size_t readSizeInBytes = readSizeInFrames * preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
-					// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
-					if (IsLoggingEnabled()) Log() << "Reading " << readSizeInFrames << " frames (" << readSizeInBytes << " bytes) from QA401";
-					preparedState.asio401.qa401.StartRead(readBuffer.data() + readBuffer.size() - readSizeInBytes, readSizeInBytes);
-				}
-
-				if (!started && readSizeInFrames > 0) {
-					if (IsLoggingEnabled()) Log() << "Starting QA401";
-					preparedState.asio401.qa401.Start();
-					started = true;
-				}
-
-				currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
-				if (IsLoggingEnabled()) Log() << "Updated position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples";
+				firstIteration = false;
 			}
 		}
 		catch (const std::exception& exception) {

@@ -16,12 +16,15 @@ namespace asio401 {
 		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
 		static constexpr auto inputChannelCount = 2;
 		static constexpr auto outputChannelCount = 2;
+		static constexpr auto readPaddingInFrames = 64;  // Number of frames in the first read that can be a remnant of the previous stream, and should be ignored. See https://github.com/dechamps/ASIO401/issues/5
 		
 		QA401(std::string_view devicePath);
 		~QA401() { AbortIO(); }
 
+		// Note that there is no Start() call. Technically we could implement one by writing 5 into register 4 but that has rather nasty side effects. See https://github.com/dechamps/ASIO401/issues/9
+		// Instead we do that register write in Reset(), and exploit the fact that the QA401 won't actually start streaming until the first write is sent. See https://github.com/dechamps/ASIO401/issues/10
+
 		void Reset(AttenuatorState attenuatorState, SampleRate sampleRate);
-		void Start();
 		void StartWrite(const void* buffer, size_t size);
 		void FinishWrite();
 		void StartRead(void* buffer, size_t size);

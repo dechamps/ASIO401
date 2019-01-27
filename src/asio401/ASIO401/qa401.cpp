@@ -86,22 +86,7 @@ namespace asio401 {
 		::Sleep(10);
 		WriteRegister(6, 6);
 		WriteRegister(6, 0);
-
-		// Read some input frames and throw them away, because they could be a remnant from the previous stream. See https://github.com/dechamps/ASIO401/issues/5
-		// We have to do an equivalent write at the same time because otherwise this read would block forever. See https://github.com/dechamps/ASIO401/issues/10
-		constexpr auto preReadFrameCount = 64;
-		{
-			std::array<uint8_t, preReadFrameCount * sampleSizeInBytes * outputChannelCount> writeBuffer = { 0 };
-			StartWrite(writeBuffer.data(), writeBuffer.size());
-			FinishWrite();
-		}
-		{
-			std::array<uint8_t, preReadFrameCount * sampleSizeInBytes * inputChannelCount> readBuffer;
-			StartRead(readBuffer.data(), readBuffer.size());
-			WriteRegister(4, 5);
-			FinishRead();
-		}
-		WriteRegister(4, 0);
+		WriteRegister(4, 5);
 
 		Log() << "QA401 is reset";
 	}
@@ -117,13 +102,6 @@ namespace asio401 {
 			(*overlappedIO)->Forget();
 			overlappedIO->reset();
 		}
-	}
-
-	void QA401::Start() {
-		Log() << "Starting QA401 streaming";
-
-		// Black magic incantation provided by QuantAsylum.
-		WriteRegister(4, 5);
 	}
 
 	void QA401::StartWrite(const void* buffer, size_t size) {
