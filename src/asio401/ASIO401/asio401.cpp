@@ -163,8 +163,8 @@ namespace asio401 {
 
 	void ASIO401::GetChannels(long* numInputChannels, long* numOutputChannels)
 	{
-		*numInputChannels = GetInputChannelCount();
-		*numOutputChannels = GetOutputChannelCount();
+		*numInputChannels = qa401.inputChannelCount;
+		*numOutputChannels = qa401.outputChannelCount;
 		Log() << "Returning " << *numInputChannels << " input channels and " << *numOutputChannels << " output channels";
 	}
 
@@ -175,11 +175,11 @@ namespace asio401 {
 		Log() << "Channel info requested for " << (info->isInput ? "input" : "output") << " channel " << info->channel;
 		if (info->isInput)
 		{
-			if (info->channel < 0 || info->channel >= GetInputChannelCount()) throw ASIOException(ASE_InvalidParameter, "no such input channel");
+			if (info->channel < 0 || info->channel >= qa401.inputChannelCount) throw ASIOException(ASE_InvalidParameter, "no such input channel");
 		}
 		else
 		{
-			if (info->channel < 0 || info->channel >= GetOutputChannelCount()) throw ASIOException(ASE_InvalidParameter, "no such output channel");
+			if (info->channel < 0 || info->channel >= qa401.outputChannelCount) throw ASIOException(ASE_InvalidParameter, "no such output channel");
 		}
 
 		info->isActive = preparedState.has_value() && preparedState->IsChannelActive(info->isInput, info->channel);
@@ -279,12 +279,12 @@ namespace asio401 {
 			ASIOBufferInfo& asioBufferInfo = asioBufferInfos[channelIndex];
 			if (asioBufferInfo.isInput)
 			{
-				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.GetInputChannelCount())
+				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.qa401.inputChannelCount)
 					throw ASIOException(ASE_InvalidParameter, "out of bounds input channel in createBuffers() buffer info");
 			}
 			else
 			{
-				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.GetOutputChannelCount())
+				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.qa401.outputChannelCount)
 					throw ASIOException(ASE_InvalidParameter, "out of bounds output channel in createBuffers() buffer info");
 			}
 			const auto getBuffer = asioBufferInfo.isInput ? &Buffers::GetInputBuffer : &Buffers::GetOutputBuffer;
@@ -371,8 +371,8 @@ namespace asio401 {
 
 		const auto qa401SampleRate = *GetQA401SampleRate(sampleRate);
 
-		const auto writeFrameSizeInBytes = preparedState.asio401.GetOutputChannelCount() * preparedState.buffers.outputSampleSize;
-		const auto readFrameSizeInBytes = preparedState.asio401.GetInputChannelCount() * preparedState.buffers.inputSampleSize;
+		const auto writeFrameSizeInBytes = preparedState.asio401.qa401.outputChannelCount * preparedState.buffers.outputSampleSize;
+		const auto readFrameSizeInBytes = preparedState.asio401.qa401.inputChannelCount * preparedState.buffers.inputSampleSize;
 		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.qa401.hardwareQueueSizeInFrames * readFrameSizeInBytes;
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInSamples * writeFrameSizeInBytes : 0;
@@ -422,7 +422,7 @@ namespace asio401 {
 					if (!firstIteration) {
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
-						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetOutputChannelCount());
+						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
 					}
 					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
@@ -432,7 +432,7 @@ namespace asio401 {
 				if (!firstIteration) {
 					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInSamples);
 					if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
-					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetInputChannelCount());
+					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSize, preparedState.buffers.bufferSizeInSamples, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
 				}
 				// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
 				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
