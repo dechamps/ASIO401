@@ -73,8 +73,44 @@ two typical causes:
  - A **ASIO401 bug** (or lack of optimization). If you believe that is the case,
    please [file a report][report].
 
+## What's the deal with DC?
+
+Here are a few things that are worth noting about ASIO401 and [DC][]:
+
+ - **The output (playback) path is DC-coupled end-to-end**, and ASIO401 supports
+   arbitrary DC offsets in that path.
+   - This means that if the ASIO Host Application gives ASIO401 samples that
+     contain a DC offset, that DC offset will appear as-is on the QA401 outputs.
+   - ASIO401 does not provide a way to configure a fixed DC offset; it assumes
+     that the ASIO Host Application will handle that. If this is something you
+     think would be useful to have as an ASIO401 configuration option, feel free
+     to [file a feature request][report].
+ - **A DC offset can appear on the QA401 outputs if an ASIO401 streaming session
+   is ended abruptly**, e.g. the ASIO Host Application crashes. This is a
+   [known issue][issue6].
+   - If streaming is suddenly interrupted without ASIO401 being given a chance
+     to clean up, the QA401 outputs will "latch on" to the last sample that was
+     played, thereby producing DC equal to the value of that last sample.
+   - DC will be produced continuously until the QA401 is reset by ASIO401 or
+     another QA401 application, or the QA401 is powered off.
+   - To avoid this issue, please ensure that the ASIO Host Application closes
+     the ASIO stream properly. This can be verified by looking for the presence
+     of a `stop()`  call near the end of the [ASIO401 log][logging].
+ - **The input (record) path is AC-coupled** in the QA401 hardware itself.
+   - In other words, DC offsets on the input cannot be measured using ASIO401.
+     This is a hardware limitation.
+ - **Be careful about applying a large DC offset to the QA401 inputs, as it can
+   damage the hardware.**
+   - This is especially true if the attenuator is disengaged. Make sure the
+     [`attenuator`][attenuator] option is set to true if there is any risk that
+     the QA401 inputs will be exposed to DC.
+   - See the QA401 User Manual from QuantAsylum for details.
+
+[attenuator]: CONFIGURATION.md#option-attenuator
 [bufferSizeSamples]: CONFIGURATION.md#option-bufferSizeSamples
 [CONFIGURATION]: CONFIGURATION.md
+[DC]: https://en.wikipedia.org/wiki/Direct_current
+[issue6]: https://github.com/dechamps/ASIO401/issues/6
 [logging]: README.md#logging
 [QuantAsylum]: https://github.com/QuantAsylum
 [QuantAsylum Analyzer]: https://github.com/QuantAsylum/QA401/releases
