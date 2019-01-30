@@ -103,6 +103,32 @@ namespace asio401 {
 			return result;
 		}
 
+		void CopyToInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, bool isInput, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, void* const interleavedBuffer, const long interleavedBufferChannelCount) {
+			for (const auto& bufferInfo : bufferInfos) {
+				if (!!bufferInfo.isInput != isInput) continue;
+
+				const auto channelNum = bufferInfo.channelNum;
+				assert(channelNum < interleavedBufferChannelCount);
+				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+
+				for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount)
+					memcpy(static_cast<uint8_t*>(interleavedBuffer) + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, buffer + sampleCount * sampleSize, sampleSize);
+			}
+		}
+
+		void CopyFromInterleavedBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, bool isInput, const size_t sampleSize, const size_t bufferSizeInSamples, const long doubleBufferIndex, const void* const interleavedBuffer, const long interleavedBufferChannelCount) {
+			for (const auto& bufferInfo : bufferInfos) {
+				if (!!bufferInfo.isInput != isInput) continue;
+
+				const auto channelNum = bufferInfo.channelNum;
+				assert(channelNum < interleavedBufferChannelCount);
+				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+
+				for (size_t sampleCount = 0; sampleCount < bufferSizeInSamples; ++sampleCount)
+					memcpy(buffer + sampleCount * sampleSize, static_cast<const uint8_t*>(interleavedBuffer) + (interleavedBufferChannelCount * sampleCount + channelNum) * sampleSize, sampleSize);
+			}
+		}
+
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
 
 		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
@@ -422,7 +448,7 @@ namespace asio401 {
 					if (!firstIteration) {
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
-						::dechamps_ASIOUtil::CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSizeInBytes, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
+						CopyToInterleavedBuffer(preparedState.bufferInfos, false, preparedState.buffers.outputSampleSizeInBytes, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.qa401.outputChannelCount);
 					}
 					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
@@ -432,7 +458,7 @@ namespace asio401 {
 				if (!firstIteration) {
 					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 					if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
-					::dechamps_ASIOUtil::CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSizeInBytes, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
+					CopyFromInterleavedBuffer(preparedState.bufferInfos, true, preparedState.buffers.inputSampleSizeInBytes, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.qa401.inputChannelCount);
 				}
 				// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
 				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
