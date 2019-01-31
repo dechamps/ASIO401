@@ -109,10 +109,11 @@ namespace asio401 {
 
 				const auto channelNum = bufferInfo.channelNum;
 				assert(channelNum < QA401::outputChannelCount);
+				const auto channelOffset = (channelNum + 1) % QA401::outputChannelCount;  // https://github.com/dechamps/ASIO401/issues/13
 				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(static_cast<uint8_t*>(qa401Buffer) + (QA401::outputChannelCount * sampleCount + channelNum) * QA401::sampleSizeInBytes, buffer + sampleCount * QA401::sampleSizeInBytes, QA401::sampleSizeInBytes);
+					memcpy(static_cast<uint8_t*>(qa401Buffer) + (QA401::outputChannelCount * sampleCount + channelOffset) * QA401::sampleSizeInBytes, buffer + sampleCount * QA401::sampleSizeInBytes, QA401::sampleSizeInBytes);
 			}
 		}
 
@@ -122,10 +123,11 @@ namespace asio401 {
 
 				const auto channelNum = bufferInfo.channelNum;
 				assert(channelNum < QA401::inputChannelCount);
+				const auto channelOffset = (channelNum + 1) % QA401::outputChannelCount;  // https://github.com/dechamps/ASIO401/issues/13
 				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(buffer + sampleCount * QA401::sampleSizeInBytes, static_cast<const uint8_t*>(qa401Buffer) + (QA401::inputChannelCount * sampleCount + channelNum) * QA401::sampleSizeInBytes, QA401::sampleSizeInBytes);
+					memcpy(buffer + sampleCount * QA401::sampleSizeInBytes, static_cast<const uint8_t*>(qa401Buffer) + (QA401::inputChannelCount * sampleCount + channelOffset) * QA401::sampleSizeInBytes, QA401::sampleSizeInBytes);
 			}
 		}
 
