@@ -29,6 +29,9 @@ add_compile_options(
 	# yet initialized) outer variable instead of the (valid) local variable within
 	# the lambda.
 	/wd4458 /wd4456
+
+	# Suppress silly "comparison of a constant with another constant" warning which rejects perfectly reasonable code such as if constexpr statements
+	/wd6326
 )
 add_definitions(
 	-DBUILD_CONFIGURATION="$<CONFIG>"
