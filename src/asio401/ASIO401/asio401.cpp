@@ -131,9 +131,33 @@ namespace asio401 {
 			}
 		}
 
+		void ConvertQA401Endianness(void* const buffer, size_t bytes) {
+			if constexpr (::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::BIG) return;
+
+			// Potential optimization opportunity: there are probably faster ways to do this, e.g. using a bswap intrinsic.
+			uint8_t* byteBuffer = static_cast<uint8_t*>(buffer);
+			while (bytes > 0) {
+				static_assert(QA401::sampleSizeInBytes == 4);
+				std::swap(byteBuffer[0], byteBuffer[3]);
+				std::swap(byteBuffer[1], byteBuffer[2]);
+
+				byteBuffer += QA401::sampleSizeInBytes;
+				bytes -= QA401::sampleSizeInBytes;
+			}
+		}
+
+		void ConvertASIOBufferEndianness(const std::vector<ASIOBufferInfo>& bufferInfos, const bool isInput, const long doubleBufferIndex, const size_t bufferSizeInFrames) {
+			for (const auto& bufferInfo : bufferInfos) {
+				if (!!bufferInfo.isInput != isInput) continue;
+				ConvertQA401Endianness(bufferInfo.buffers[doubleBufferIndex], bufferSizeInFrames * 4);
+			}
+		}
+
 		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
 
-		constexpr ASIOSampleType qa401SampleType = ASIOSTInt32MSB;
+		constexpr ASIOSampleType sampleType = ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::BIG ? ASIOSTInt32MSB : ASIOSTInt32LSB;
+		using NativeSampleType = int32_t;
+		static_assert(sizeof(NativeSampleType) == QA401::sampleSizeInBytes);
 
 		std::optional<QA401::SampleRate> GetQA401SampleRate(ASIOSampleRate sampleRate) {
 			return ::dechamps_cpputil::Find(sampleRate, std::initializer_list<std::pair<ASIOSampleType, QA401::SampleRate>>{
@@ -212,7 +236,7 @@ namespace asio401 {
 
 		info->isActive = preparedState.has_value() && preparedState->IsChannelActive(info->isInput, info->channel);
 		info->channelGroup = 0;
-		info->type = qa401SampleType;
+		info->type = sampleType;
 		std::stringstream channel_string;
 		channel_string << (info->isInput ? "IN" : "OUT") << " " << info->channel;
 		switch (info->channel) {
@@ -448,6 +472,7 @@ namespace asio401 {
 					// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
 					// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
 					if (!firstIteration) {
+						ConvertASIOBufferEndianness(preparedState.bufferInfos, false, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
 						CopyToQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data());
@@ -466,6 +491,7 @@ namespace asio401 {
 				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
 				if (IsLoggingEnabled()) Log() << "Reading from QA401";
 				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
+				if (!firstIteration) ConvertASIOBufferEndianness(preparedState.bufferInfos, true, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
 				
 				if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 				samplePosition = currentSamplePosition;
