@@ -473,20 +473,22 @@ namespace asio401 {
 				qa401SampleRate
 			);
 
-			// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
-			// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
-			// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
-			//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
-			//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
-			preparedState.asio401.qa401.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
-			// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
-			// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
-			// Starting streaming that way as a few interesting consequences:
-			//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
-			//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
-			preparedState.asio401.qa401.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
-			preparedState.asio401.qa401.FinishWrite();
-			preparedState.asio401.qa401.FinishRead();
+			if (preparedState.buffers.inputChannelCount > 0) {
+				// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
+				// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
+				// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
+				//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
+				//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
+				preparedState.asio401.qa401.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+				// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
+				// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
+				// Starting streaming that way as a few interesting consequences:
+				//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
+				//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
+				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+				preparedState.asio401.qa401.FinishWrite();
+				preparedState.asio401.qa401.FinishRead();
+			}
 
 			// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
 			bool firstIteration = true;
