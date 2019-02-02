@@ -171,6 +171,33 @@ namespace asio401 {
 			{192000, QA401::SampleRate::KHZ192},
 		};
 
+		template <typename Integer> void NegateIntegerBuffer(Integer* buffer, size_t count) {
+			std::replace(buffer, buffer + count, (std::numeric_limits<Integer>::min)(), (std::numeric_limits<Integer>::min)() + 1);
+			std::transform(buffer, buffer + count, buffer, std::negate());
+		}
+
+		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames) {
+			for (const auto& bufferInfo : bufferInfos) {
+				if (bufferInfo.isInput) continue;
+
+				// Invert polarity of all output channels. See https://github.com/dechamps/ASIO401/issues/14
+				NegateIntegerBuffer(static_cast<NativeSampleType*>(bufferInfo.buffers[doubleBufferIndex]), bufferSizeInFrames);
+			}
+
+			ConvertASIOBufferEndianness(bufferInfos, false, doubleBufferIndex, bufferSizeInFrames);
+		}
+
+		void PostProcessASIOInputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames) {
+			ConvertASIOBufferEndianness(bufferInfos, true, doubleBufferIndex, bufferSizeInFrames);
+
+			for (const auto& bufferInfo : bufferInfos) {
+				if (!bufferInfo.isInput) continue;
+
+				// Invert polarity of the right input channel. See https://github.com/dechamps/ASIO401/issues/14
+				if (bufferInfo.channelNum == 1) NegateIntegerBuffer(static_cast<NativeSampleType*>(bufferInfo.buffers[doubleBufferIndex]), bufferSizeInFrames);
+			}
+		}
+
 	}
 
 	ASIO401::ASIO401(void* sysHandle) :
@@ -472,7 +499,7 @@ namespace asio401 {
 					// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
 					// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
 					if (!firstIteration) {
-						ConvertASIOBufferEndianness(preparedState.bufferInfos, false, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
+						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
 						CopyToQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data());
@@ -491,7 +518,7 @@ namespace asio401 {
 				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
 				if (IsLoggingEnabled()) Log() << "Reading from QA401";
 				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
-				if (!firstIteration) ConvertASIOBufferEndianness(preparedState.bufferInfos, true, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
+				if (!firstIteration) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
 				
 				if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 				samplePosition = currentSamplePosition;
