@@ -406,8 +406,15 @@ namespace asio401 {
 	void ASIO401::PreparedState::GetLatencies(long* inputLatency, long* outputLatency)
 	{
 		*inputLatency = long(buffers.bufferSizeInFrames);
-		*outputLatency = long(buffers.bufferSizeInFrames) * 2;  // Because we don't support ASIOOutputReady() - see ASIO SDK docs, dechamps_ASIOUtil/BUFFERS.md
-		if (buffers.inputChannelCount == 0 && !asio401.config.forceRead) *outputLatency += asio401.qa401.hardwareQueueSizeInFrames;
+		*outputLatency = long(buffers.bufferSizeInFrames);
+		if (!asio401.hostSupportsOutputReady) {
+			Log() << buffers.bufferSizeInFrames << " samples added to output latency due to the ASIO Host Application not supporting OutputReady";
+			*outputLatency += long(buffers.bufferSizeInFrames);
+		}
+		if (buffers.inputChannelCount == 0 && !asio401.config.forceRead) {
+			Log() << asio401.qa401.hardwareQueueSizeInFrames << " samples added to output latency due to write-only mode";
+			*outputLatency += asio401.qa401.hardwareQueueSizeInFrames;
+		}
 		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
 	}
 
@@ -425,6 +432,7 @@ namespace asio401 {
 	ASIO401::PreparedState::RunningState::RunningState(PreparedState& preparedState) :
 		preparedState(preparedState),
 		sampleRate(preparedState.asio401.sampleRate),
+		hostSupportsOutputReady(preparedState.asio401.hostSupportsOutputReady),
 		host_supports_timeinfo([&] {
 		Log() << "Checking if the host supports time info";
 		const bool result = preparedState.callbacks.asioMessage &&
@@ -504,6 +512,15 @@ namespace asio401 {
 					// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
 					// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
 					if (!firstIteration) {
+						if (hostSupportsOutputReady) {
+							std::unique_lock outputReadyLock(outputReadyMutex);
+							if (!outputReady) {
+								if (IsLoggingEnabled()) Log() << "Waiting for the ASIO Host Application to signal OutputReady";
+								outputReadyCondition.wait(outputReadyLock, [&]{ return outputReady; });
+								outputReady = false;
+							}
+						}
+
 						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
 						preparedState.asio401.qa401.FinishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
@@ -511,11 +528,12 @@ namespace asio401 {
 					}
 					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
+
+				if (hostSupportsOutputReady) driverBufferIndex = (driverBufferIndex + 1) % 2;
 				
 				if (!firstIteration && mustRead) preparedState.asio401.qa401.FinishRead();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 				if (!firstIteration) {
-					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 					if (preparedState.buffers.inputChannelCount > 0) {
 						if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
 						CopyFromQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data());
@@ -526,27 +544,34 @@ namespace asio401 {
 					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
 					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
 				}
-				
-				if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
-				samplePosition = currentSamplePosition;
 
-				if (!host_supports_timeinfo) {
-					if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
-					preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
-					if (IsLoggingEnabled()) Log() << "bufferSwitch() complete";
-				}
-				else {
-					ASIOTime time = { 0 };
-					time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
-					time.timeInfo.samplePosition = currentSamplePosition.samples;
-					time.timeInfo.systemTime = currentSamplePosition.timestamp;
-					time.timeInfo.sampleRate = sampleRate;
-					if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
-					const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
-					if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
+				// If the host supports OutputReady then we only need to write one buffer in advance, not two.
+				// Therefore, we can wait for the initial silent buffer to make it through and buffer 1 to start playing before we ask the application to start generating buffer 0.
+				if (!(firstIteration && hostSupportsOutputReady)) {
+					if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
+					samplePosition = currentSamplePosition;
+
+					if (!host_supports_timeinfo) {
+						if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
+						preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
+						if (IsLoggingEnabled()) Log() << "bufferSwitch() complete";
+					}
+					else {
+						ASIOTime time = { 0 };
+						time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
+						time.timeInfo.samplePosition = currentSamplePosition.samples;
+						time.timeInfo.systemTime = currentSamplePosition.timestamp;
+						time.timeInfo.sampleRate = sampleRate;
+						if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
+						const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
+						if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
+					}
+
+					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 				}
 
-				driverBufferIndex = (driverBufferIndex + 1) % 2;
+				if (!hostSupportsOutputReady) driverBufferIndex = (driverBufferIndex + 1) % 2;
+
 				preparedState.asio401.qa401.Ping();
 				firstIteration = false;
 			}
@@ -602,6 +627,26 @@ namespace asio401 {
 		*sPos = currentSamplePosition.samples;
 		*tStamp = currentSamplePosition.timestamp;
 		if (IsLoggingEnabled()) Log() << "Returning: sample position " << ::dechamps_ASIOUtil::ASIOToInt64(*sPos) << ", timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(*tStamp);
+	}
+
+	void ASIO401::OutputReady() {
+		if (!hostSupportsOutputReady) {
+			Log() << "Host supports OutputReady";
+			hostSupportsOutputReady = true;
+		}
+		if (preparedState.has_value()) preparedState->OutputReady();
+	}
+
+	void ASIO401::PreparedState::OutputReady() {
+		if (runningState != nullptr) runningState->OutputReady();
+	}
+
+	void ASIO401::PreparedState::RunningState::OutputReady() {
+		{
+			std::scoped_lock outputReadyLock(outputReadyMutex);
+			outputReady = true;
+		}
+		outputReadyCondition.notify_all();
 	}
 
 	void ASIO401::PreparedState::RequestReset() {

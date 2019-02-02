@@ -11,6 +11,7 @@
 #include <atomic>
 #include <optional>
 #include <stdexcept>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -43,6 +44,7 @@ namespace asio401 {
 		void Start();
 		void Stop();
 		void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp);
+		void OutputReady();
 
 		void ControlPanel();
 
@@ -61,6 +63,7 @@ namespace asio401 {
 			void Stop();
 
 			void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp);
+			void OutputReady();
 
 			void RequestReset();
 
@@ -95,6 +98,7 @@ namespace asio401 {
 				~RunningState();
 
 				void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) const;
+				void OutputReady();
 
 			private:
 				struct SamplePosition {
@@ -117,9 +121,14 @@ namespace asio401 {
 
 				PreparedState& preparedState;
 				const ASIOSampleRate sampleRate;
+				const bool hostSupportsOutputReady;
 				const bool host_supports_timeinfo;
 				std::atomic<bool> stopRequested = false;
 				std::atomic<SamplePosition> samplePosition;
+
+				std::mutex outputReadyMutex;
+				std::condition_variable outputReadyCondition;
+				bool outputReady = true;
 
 				Registration registration{ preparedState.runningState, *this };
 				std::thread thread;
@@ -144,6 +153,7 @@ namespace asio401 {
 
 		ASIOSampleRate sampleRate = 48000;
 		bool sampleRateWasAccessed = false;
+		bool hostSupportsOutputReady = false;
 
 		std::optional<PreparedState> preparedState;
 	};
