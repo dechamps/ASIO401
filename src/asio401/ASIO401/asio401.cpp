@@ -407,6 +407,7 @@ namespace asio401 {
 	{
 		*inputLatency = long(buffers.bufferSizeInFrames);
 		*outputLatency = long(buffers.bufferSizeInFrames) * 2;  // Because we don't support ASIOOutputReady() - see ASIO SDK docs, dechamps_ASIOUtil/BUFFERS.md
+		if (buffers.inputChannelCount == 0 && !asio401.config.forceRead) *outputLatency += asio401.qa401.hardwareQueueSizeInFrames;
 		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
 	}
 
@@ -490,6 +491,8 @@ namespace asio401 {
 				preparedState.asio401.qa401.FinishRead();
 			}
 
+			const auto mustRead = preparedState.buffers.inputChannelCount > 0 || preparedState.asio401.config.forceRead;
+
 			// Note: see ../dechamps_ASIOUtil/BUFFERS.md for an explanation of ASIO buffer management and operation order.
 			bool firstIteration = true;
 			long driverBufferIndex = 0;
@@ -509,18 +512,20 @@ namespace asio401 {
 					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
 				}
 				
-				if (!firstIteration) preparedState.asio401.qa401.FinishRead();
+				if (!firstIteration && mustRead) preparedState.asio401.qa401.FinishRead();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 				if (!firstIteration) {
 					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
-					if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
-					CopyFromQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data());
+					if (preparedState.buffers.inputChannelCount > 0) {
+						if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
+						CopyFromQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data());
+					}
 				}
-				// Note that we always read even if no input channels are enabled, because we use read operations to synchronize with the QA401 clock.
-				// TODO: we could get away with not doing that for large buffer sizes, see https://github.com/dechamps/ASIO401/issues/12
-				if (IsLoggingEnabled()) Log() << "Reading from QA401";
-				preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
-				if (!firstIteration) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
+				if (mustRead) {
+					if (IsLoggingEnabled()) Log() << "Reading from QA401";
+					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
+					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
+				}
 				
 				if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 				samplePosition = currentSamplePosition;

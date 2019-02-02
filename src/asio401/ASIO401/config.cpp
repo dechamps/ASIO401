@@ -89,6 +89,7 @@ namespace asio401 {
 		void SetConfig(const toml::Table& table, Config& config) {
 			SetOption(table, "attenuator", config.attenuator);
 			SetOption(table, "bufferSizeSamples", config.bufferSizeSamples, ValidateBufferSize);
+			SetOption(table, "forceRead", config.forceRead);
 		}
 
 	}

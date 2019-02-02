@@ -110,6 +110,41 @@ The default behaviour is to advertise minimum, preferred and maximum buffer
 sizes of 64, 1024 and 32768 samples, respectively. If the application selects
 a 192 kHz sample rate, the preferred buffer size becomes 4096 samples.
 
+### Option `forceRead`
+
+*Boolean*-typed option that determines if ASIO401 will fetch audio data from the
+QA401 for clock synchronization purposes even if no input channels are enabled.
+
+This option only has an effect if the ASIO Host Application exclusively uses
+ASIO401 in the output direction. The value of this option is ignored if any
+input channels are used, since in that case ASIO401 has to read data from the
+QA401 anyway.
+
+If the option is set to `true` (or the ASIO Host application enables any
+input channels), then ASIO401 will use read operations to monitor the progress
+of the QA401 clock, and will use that information to issue writes at the
+appropriate time. This decreases output latency.
+
+If the option is set to `false` (and the ASIO Host application does not enable
+any input channels), then ASIO401 will not issue any read operations, and will
+use write pushback to synchronize with the QA401 clock. This improves efficiency
+and relaxes performance constraints because USB load is reduced. On top of that,
+the likelihood of glitches (discontinuities) from missed deadlines is reduced
+because the QA401 output queue acts as an additional buffer. However, for the
+same reason, the output latency is increased by the length of the QA401 output
+queue, i.e. 1024 samples.
+
+In general, it does not make sense to enable this option unless you care about
+latency.
+
+Example:
+
+```toml
+forceRead = true
+```
+
+The default value is `false`.
+
 [bufferSizeSamples]: #option-bufferSizeSamples
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file
 [GUI]: https://en.wikipedia.org/wiki/Graphical_user_interface
