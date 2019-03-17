@@ -99,6 +99,9 @@ Here are a few things that are worth noting about ASIO401 and [DC][]:
  - **The input (record) path is AC-coupled** in the QA401 hardware itself.
    - In other words, DC offsets on the input cannot be measured using ASIO401.
      This is a hardware limitation.
+   - Note, however, that a very small amount of DC (less than -60 dBFS) will
+     typically linger in the input signal for about 20 seconds after streaming
+     starts if the attenuator is disengaged. This is a [known issue][issue17].
  - **Be careful about applying a large DC offset to the QA401 inputs, as it can
    damage the hardware.**
    - This is especially true if the attenuator is disengaged. Make sure the
@@ -111,6 +114,7 @@ Here are a few things that are worth noting about ASIO401 and [DC][]:
 [CONFIGURATION]: CONFIGURATION.md
 [DC]: https://en.wikipedia.org/wiki/Direct_current
 [issue6]: https://github.com/dechamps/ASIO401/issues/6
+[issue17]: https://github.com/dechamps/ASIO401/issues/17
 [logging]: README.md#logging
 [QuantAsylum]: https://github.com/QuantAsylum
 [QuantAsylum Analyzer]: https://github.com/QuantAsylum/QA401/releases
