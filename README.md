@@ -1,6 +1,8 @@
 # ASIO401, the unofficial QA401 ASIO driver
 *Brought to you by [Etienne Dechamps][] - [GitHub][]*
 
+*ASIO is a trademark and software of Steinberg Media Technologies GmbH*
+
 **If you are looking for an installer, see the
 [GitHub releases page][releases].**
 
@@ -91,6 +93,10 @@ ASIO401 welcomes feedback. Feel free to [file an issue][] in the
 When asking for help, it is strongly recommended to [produce a log][logging]
 while the problem is occurring, and attach it to your report. The output of
 [`ASIO401Test`][test], along with its log output, might also help.
+
+---
+
+![ASIO logo](ASIO.jpg)
 
 [ASIO]: http://en.wikipedia.org/wiki/Audio_Stream_Input/Output
 [CONFIGURATION]: CONFIGURATION.md

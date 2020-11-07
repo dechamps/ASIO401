@@ -24,6 +24,7 @@ Source:"x86\install\bin\ASIO401.dll"; DestDir: "{app}\x86"; Flags: ignoreversion
 Source:"x86\install\bin\*"; DestDir: "{app}\x86"; Flags: ignoreversion
 Source:"*.txt"; DestDir:"{app}"; Flags: ignoreversion
 Source:"*.md"; DestDir:"{app}"; Flags: ignoreversion
+Source:"*.jpg"; DestDir:"{app}"; Flags: ignoreversion
 
 [Run]
 Filename:"https://github.com/dechamps/ASIO401/blob/@DECHAMPS_CMAKEUTILS_GIT_DESCRIPTION@/README.md"; Description:"Open README"; Flags: postinstall shellexec nowait

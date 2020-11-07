@@ -145,6 +145,10 @@ forceRead = true
 
 The default value is `false`.
 
+---
+
+*ASIO is a trademark and software of Steinberg Media Technologies GmbH*
+
 [bufferSizeSamples]: #option-bufferSizeSamples
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file
 [GUI]: https://en.wikipedia.org/wiki/Graphical_user_interface

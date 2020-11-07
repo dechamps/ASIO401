@@ -109,6 +109,10 @@ Here are a few things that are worth noting about ASIO401 and [DC][]:
      the QA401 inputs will be exposed to DC.
    - See the QA401 User Manual from QuantAsylum for details.
 
+---
+
+*ASIO is a trademark and software of Steinberg Media Technologies GmbH*
+
 [attenuator]: CONFIGURATION.md#option-attenuator
 [bufferSizeSamples]: CONFIGURATION.md#option-bufferSizeSamples
 [CONFIGURATION]: CONFIGURATION.md

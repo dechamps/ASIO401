@@ -1,5 +1,8 @@
 # ASIO401 Developer Information
 
+See `LICENSE.txt` for licensing information. In particular, do note that
+specific license terms apply to the ASIO trademark and ASIO SDK.
+
 ## Building
 
 ASIO401 is designed to be built using CMake within the Microsoft Visual C++
@@ -26,6 +29,10 @@ cmake -P installer.cmake
 ```
 
 Note that for this command to work, you need to have [Inno Setup][] installed.
+
+---
+
+*ASIO is a trademark and software of Steinberg Media Technologies GmbH*
 
 [ASIO SDK]: http://www.steinberg.net/en/company/developer.html
 [Inno Setup]: http://www.jrsoftware.org/isdl.php
