@@ -1,0 +1,4 @@
+# Visual Studio 2022 files
+.vs/
+CMakeSettings.json
+out/
