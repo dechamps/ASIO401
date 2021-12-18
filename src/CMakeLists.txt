@@ -98,4 +98,12 @@ ExternalProject_Add(
 
 install(DIRECTORY "${INTERNAL_INSTALL_PREFIX}/" DESTINATION "${CMAKE_INSTALL_PREFIX}")
 install(SCRIPT dechamps_CMakeUtils/InstallPdbFiles.cmake)
+
+# Work around https://developercommunity.visualstudio.com/t/1616850
+if (MSVC_VERSION EQUAL 1930 AND MSVC_TOOLSET_VERSION EQUAL 142)
+	cmake_host_system_information(RESULT VS_DIR QUERY VS_17_DIR)
+	file(GLOB MSVC_REDIST_LIBRARIES "${VS_DIR}/VC/Redist/MSVC/*/${MSVC_C_ARCHITECTURE_ID}/Microsoft.VC143.CRT/*.dll")
+	list(APPEND CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS "${MSVC_REDIST_LIBRARIES}")
+	set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS TRUE)
+endif()
 include(InstallRequiredSystemLibraries)
