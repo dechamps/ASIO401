@@ -141,7 +141,7 @@ namespace asio401 {
 			std::optional<ASIO401> asio401;
 
 			template <typename Functor> ASIOError Enter(std::string_view context, Functor functor);
-			template <typename... Args> ASIOError EnterInitialized(std::string_view context, Args&&... args);
+			template <typename Functor> ASIOError EnterInitialized(std::string_view context, Functor functor);
 			template <typename Method, typename... Args> ASIOError EnterWithMethod(std::string_view context, Method method, Args&&... args);
 		};
 
@@ -175,11 +175,13 @@ namespace asio401 {
 			return result;
 		}
 
-		template <typename... Args> ASIOError CASIO401::EnterInitialized(std::string_view context, Args&&... args) {
-			if (!asio401.has_value()) {
-				throw ASIOException(ASE_InvalidMode, std::string("entered ") + std::string(context) + " but uninitialized state");
-			}
-			return Enter(context, std::forward<Args>(args)...);
+		template <typename Functor> ASIOError CASIO401::EnterInitialized(std::string_view context, Functor functor) {
+			return Enter(context, [&] {
+				if (!asio401.has_value()) {
+					throw ASIOException(ASE_InvalidMode, std::string("entered ") + std::string(context) + " but uninitialized state");
+				}
+				functor();
+				});
 		}
 
 		template <typename Method, typename... Args> ASIOError CASIO401::EnterWithMethod(std::string_view context, Method method, Args&&... args) {
