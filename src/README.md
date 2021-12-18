@@ -6,7 +6,7 @@ specific license terms apply to the ASIO trademark and ASIO SDK.
 ## Building
 
 ASIO401 is designed to be built using CMake within the Microsoft Visual C++
-2017 toolchain native CMake support.
+2019/2022 toolchain native CMake support.
 
 ASIO401 uses a CMake "superbuild" system (in `/src`) to automatically build the
 dependencies before building ASIO401 itself. These dependencies are pulled in as
