@@ -1,5 +1,7 @@
 # ASIO401 Developer Information
 
+[![.github/workflows/continuous-integration.yml](https://github.com/dechamps/ASIO401/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/dechamps/ASIO401/actions/workflows/continuous-integration.yml)
+
 See `LICENSE.txt` for licensing information. In particular, do note that
 specific license terms apply to the ASIO trademark and ASIO SDK.
 
@@ -32,6 +34,10 @@ Note that for this command to work:
  -  You need to have [Inno Setup][] installed.
  -  You need to have built ASIO401 in the `x64-Release` and `x86-Release`
     Visual Studio configurations first.
+
+**Note:** instead of running `installer.cmake` manually, it is often preferable
+to let the ASIO401 GitHub Actions workflow build the installer, as that
+guarantees a clean build.
 
 ---
 
