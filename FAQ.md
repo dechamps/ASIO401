@@ -9,6 +9,23 @@ The reason for the lack of a proper control panel is because developing a
 graphical user interface requires a lot of time and resources, which ASIO401
 currently doesn't have.
 
+## Why is ASIO401 ignoring my configuration file and/or logfile?
+
+You can double-check that the files are located in the correct folder and are
+named properly by running the following in a command-line prompt:
+
+```
+dir %userprofile%\ASIO401*
+```
+
+The output should list `ASIO401.toml` and/or `ASIO401.log`.
+
+**Note:** it is typical for Windows and some text editors to automatically add a
+`.txt` extension to file names. This results in files named `ASIO401.toml.txt`
+or `ASIO401.log.txt`, which won't work. To confuse matters further, Windows
+*hides* `.txt` extensions by default. Use the aforementioned command to reveal
+the true file name.
+
 ## Why does ASIO401 fail to initialize?
 
 ASIO401 can fail to initialize for a variety of reasons. Sadly, the ASIO API
