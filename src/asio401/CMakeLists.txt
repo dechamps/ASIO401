@@ -32,6 +32,9 @@ add_compile_options(
 
 	# Suppress silly "comparison of a constant with another constant" warning which rejects perfectly reasonable code such as if constexpr statements
 	/wd6326
+
+	# Work around https://developercommunity.visualstudio.com/t/1617074 (assert() statements)
+	/wd4189
 )
 add_definitions(
 	-DBUILD_CONFIGURATION="$<CONFIG>"
