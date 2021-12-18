@@ -147,6 +147,16 @@ namespace asio401 {
 			std::optional<RunningState> ownedRunningState;
 		};
 
+		struct BufferSizes {
+			long minimum;
+			long maximum;
+			long preferred;
+			long granularity;
+		};
+		BufferSizes ComputeBufferSizes() const;
+
+		void ComputeLatencies(long* inputLatency, long* outputLatency, long bufferSizeInFrames, bool outputOnly) const;
+
 		const HWND windowHandle = nullptr;
 		const Config config;
 		QA401 qa401;

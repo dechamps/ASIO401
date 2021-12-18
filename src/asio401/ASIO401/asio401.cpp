@@ -216,27 +216,38 @@ namespace asio401 {
 		Log() << "sysHandle = " << sysHandle;
 	}
 
-	void ASIO401::GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity)
+	ASIO401::BufferSizes ASIO401::ComputeBufferSizes() const
 	{
+		BufferSizes bufferSizes;
 		if (config.bufferSizeSamples.has_value()) {
 			Log() << "Using buffer size " << *config.bufferSizeSamples << " from configuration";
-			*minSize = *maxSize = *preferredSize = long(*config.bufferSizeSamples);
-			*granularity = 0;
+			bufferSizes.minimum = bufferSizes.maximum = bufferSizes.preferred = long(*config.bufferSizeSamples);
+			bufferSizes.granularity = 0;
 		}
 		else {
 			// Mostly arbitrary; based on the size of a single USB bulk transfer packet
-			*minSize = 64;
+			bufferSizes.minimum = 64;
 
 			// At 48 kHz, keep the QA401 hardware queue filled at all times; good tradeoff between reliability and latency
 			// Above 48 kHz, increase the suggested buffer size proportionally in an attempt to alleviate scheduling/processing timing constraints
-			*preferredSize = long(qa401.hardwareQueueSizeInFrames * (std::max)(sampleRate / 48000, 1.0));
+			bufferSizes.preferred = long(qa401.hardwareQueueSizeInFrames * (std::max)(sampleRate / 48000, 1.0));
 
 			// Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
-			*maxSize = 32768;
+			bufferSizes.maximum = 32768;
 
 			// Mostly arbitrary; based on the size of a single USB bulk transfer packet
-			*granularity = 64;
+			bufferSizes.granularity = 64;
 		}
+		return bufferSizes;
+	}
+
+	void ASIO401::GetBufferSize(long* minSize, long* maxSize, long* preferredSize, long* granularity)
+	{
+		const auto bufferSizes = ComputeBufferSizes();
+		*minSize = bufferSizes.minimum;
+		*maxSize = bufferSizes.maximum;
+		*preferredSize = bufferSizes.preferred;
+		*granularity = bufferSizes.granularity;
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
 	}
 
@@ -399,23 +410,35 @@ namespace asio401 {
 	}
 
 	void ASIO401::GetLatencies(long* inputLatency, long* outputLatency) {
-		if (!preparedState.has_value()) throw ASIOException(ASE_InvalidMode, "getLatencies() called before createBuffers()");
-		return preparedState->GetLatencies(inputLatency, outputLatency);
+		if (preparedState.has_value()) {
+			preparedState->GetLatencies(inputLatency, outputLatency);
+		}
+		else {
+			// A GetLatencies() call before CreateBuffers() puts us in a difficult situation,
+			// but according to the ASIO SDK we have to come up with a number and some
+			// applications rely on it - see https://github.com/dechamps/FlexASIO/issues/122.
+			Log() << "GetLatencies() called before CreateBuffers() - assuming preferred buffer size, full duplex";
+			ComputeLatencies(inputLatency, outputLatency, ComputeBufferSizes().preferred, /*outputOnly=*/false);
+		}
+	}
+
+	void ASIO401::ComputeLatencies(long* const inputLatency, long* const outputLatency, long bufferSizeInFrames, bool outputOnly) const
+	{
+		*inputLatency = *outputLatency = bufferSizeInFrames;
+		if (!hostSupportsOutputReady) {
+			Log() << bufferSizeInFrames << " samples added to output latency due to the ASIO Host Application not supporting OutputReady";
+			*outputLatency += bufferSizeInFrames;
+		}
+		if (outputOnly && !config.forceRead) {
+			Log() << qa401.hardwareQueueSizeInFrames << " samples added to output latency due to write-only mode";
+			*outputLatency += qa401.hardwareQueueSizeInFrames;
+		}
+		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
 	}
 
 	void ASIO401::PreparedState::GetLatencies(long* inputLatency, long* outputLatency)
 	{
-		*inputLatency = long(buffers.bufferSizeInFrames);
-		*outputLatency = long(buffers.bufferSizeInFrames);
-		if (!asio401.hostSupportsOutputReady) {
-			Log() << buffers.bufferSizeInFrames << " samples added to output latency due to the ASIO Host Application not supporting OutputReady";
-			*outputLatency += long(buffers.bufferSizeInFrames);
-		}
-		if (buffers.inputChannelCount == 0 && !asio401.config.forceRead) {
-			Log() << asio401.qa401.hardwareQueueSizeInFrames << " samples added to output latency due to write-only mode";
-			*outputLatency += asio401.qa401.hardwareQueueSizeInFrames;
-		}
-		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
+		asio401.ComputeLatencies(inputLatency, outputLatency, long(buffers.bufferSizeInFrames), /*outputOnly=*/buffers.inputChannelCount == 0);
 	}
 
 	void ASIO401::Start() {
