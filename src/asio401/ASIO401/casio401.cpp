@@ -9,10 +9,7 @@
 #include <dechamps_ASIOUtil/asiosdk/iasiodrv.h>
 #include <dechamps_ASIOUtil/asio.h>
 
-#pragma warning(push)
-#pragma warning(disable:28204 6001 6011 6387)
 #include <atlbase.h>
-#pragma warning(pop)
 #include <atlcom.h>
 
 #include <cstdlib>
