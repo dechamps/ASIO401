@@ -145,7 +145,7 @@ namespace asio401 {
 		OBJECT_ENTRY_AUTO(__uuidof(::CASIO401), CASIO401);
 
 		template <typename Functor> ASIOError CASIO401::Enter(std::string_view context, Functor functor) {
-			if (IsLoggingEnabled()) Log() << "--- ENTERING CONTEXT: " << context;
+			if (IsLoggingEnabled()) Log() << "--- ENTERING CONTEXT: " << context << " on " << this;
 			ASIOError result;
 			try {
 				functor();
