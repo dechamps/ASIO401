@@ -540,8 +540,8 @@ namespace asio401 {
 							if (!outputReady) {
 								if (IsLoggingEnabled()) Log() << "Waiting for the ASIO Host Application to signal OutputReady";
 								outputReadyCondition.wait(outputReadyLock, [&]{ return outputReady; });
-								outputReady = false;
 							}
+							outputReady = false;
 						}
 
 						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
