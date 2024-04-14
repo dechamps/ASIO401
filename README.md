@@ -65,7 +65,8 @@ trouble interpreting the contents of the log, feel free to
 *Do not forget to remove the logfile once you're done with it* (or move
 it elsewhere). Indeed, logging slows down ASIO401, which can lead to
 discontinuities (audio glitches). The logfile can also grow to a very
-large size over time.
+large size over time. To prevent accidental disk space exhaustion, FlexASIO will
+stop logging if the logfile exceeds 1 GB.
 
 ### Test program
 
