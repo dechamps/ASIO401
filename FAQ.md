@@ -14,8 +14,14 @@ currently doesn't have.
 You can double-check that the files are located in the correct folder and are
 named properly by running the following in a command-line prompt:
 
-```
+```batch
 dir %userprofile%\ASIO401*
+```
+
+Or, if you are using PowerShell:
+
+```powershell
+dir $env:userprofile\ASIO401*
 ```
 
 The output should list `ASIO401.toml` and/or `ASIO401.log`.
