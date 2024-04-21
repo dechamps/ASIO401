@@ -142,6 +142,7 @@ namespace asio401 {
 
 			const auto error = GetWindowsErrorString(*getOverlappedResultError);
 			Log() << "WinUSB overlapped I/O " << &state->overlapped << " failed: " << error;
+			state.reset();
 			throw std::runtime_error("WinUSB overlapped  I/O failed: " + error);
 		}
 		if (lengthTransferred != state->size) {
