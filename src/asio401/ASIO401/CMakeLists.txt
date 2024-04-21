@@ -74,12 +74,14 @@ target_link_libraries(ASIO401_qa40x
 add_library(ASIO401_qa401 STATIC EXCLUDE_FROM_ALL qa401.cpp)
 target_link_libraries(ASIO401_qa401
 	PUBLIC ASIO401_qa40x
+	PUBLIC dechamps_cpputil::endian
 	PRIVATE ASIO401_log
 )
 
 add_library(ASIO401_qa403 STATIC EXCLUDE_FROM_ALL qa403.cpp)
 target_link_libraries(ASIO401_qa403
 	PUBLIC ASIO401_qa40x
+	PUBLIC dechamps_cpputil::endian
 	PRIVATE ASIO401_log
 )
 

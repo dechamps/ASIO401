@@ -136,9 +136,7 @@ namespace asio401 {
 			}
 		}
 
-		void ConvertQA40xEndianness(void* const buffer, size_t bytes, const size_t sampleSizeInBytes) {
-			if constexpr (::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::BIG) return;
-
+		void SwapEndianness(void* const buffer, size_t bytes, const size_t sampleSizeInBytes) {
 			assert(sampleSizeInBytes == 4);
 
 			// Potential optimization opportunity: there are probably faster ways to do this, e.g. using a bswap intrinsic.
@@ -152,10 +150,11 @@ namespace asio401 {
 			}
 		}
 
-		void ConvertASIOBufferEndianness(const std::vector<ASIOBufferInfo>& bufferInfos, const bool isInput, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes) {
+		void ConvertASIOBufferEndianness(const std::vector<ASIOBufferInfo>& bufferInfos, const bool isInput, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes, ::dechamps_cpputil::Endianness deviceSampleEndianness) {
+			if (::dechamps_cpputil::endianness == deviceSampleEndianness) return;
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!!bufferInfo.isInput != isInput) continue;
-				ConvertQA40xEndianness(bufferInfo.buffers[doubleBufferIndex], bufferSizeInFrames * 4, sampleSizeInBytes);
+				SwapEndianness(bufferInfo.buffers[doubleBufferIndex], bufferSizeInFrames * 4, sampleSizeInBytes);
 			}
 		}
 
@@ -179,7 +178,7 @@ namespace asio401 {
 			std::transform(buffer, buffer + count, buffer, std::negate());
 		}
 
-		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes) {
+		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes, ::dechamps_cpputil::Endianness deviceSampleEndianness) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (bufferInfo.isInput) continue;
 
@@ -187,11 +186,11 @@ namespace asio401 {
 				NegateIntegerBuffer(static_cast<NativeSampleType*>(bufferInfo.buffers[doubleBufferIndex]), bufferSizeInFrames);
 			}
 
-			ConvertASIOBufferEndianness(bufferInfos, false, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes);
+			ConvertASIOBufferEndianness(bufferInfos, false, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes, deviceSampleEndianness);
 		}
 
-		void PostProcessASIOInputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes) {
-			ConvertASIOBufferEndianness(bufferInfos, true, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes);
+		void PostProcessASIOInputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes, ::dechamps_cpputil::Endianness deviceSampleEndianness) {
+			ConvertASIOBufferEndianness(bufferInfos, true, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes, deviceSampleEndianness);
 
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!bufferInfo.isInput) continue;
@@ -259,6 +258,7 @@ namespace asio401 {
 
 	long ASIO401::GetDeviceInputChannelCount() const { return std::visit([](const auto& device) { return device.inputChannelCount; }, device);  }
 	long ASIO401::GetDeviceOutputChannelCount() const { return std::visit([](const auto& device) { return device.outputChannelCount; }, device); }
+	::dechamps_cpputil::Endianness ASIO401::GetDeviceSampleEndianness() const { return std::visit([](const auto& device) { return device.sampleEndianness; }, device); }
 	size_t ASIO401::GetDeviceSampleSizeInBytes() const { return std::visit([](const auto& device) { return device.sampleSizeInBytes; }, device); }
 	size_t ASIO401::GetHardwareQueueSizeInFrames() const { return std::visit([](const auto& device) { return device.hardwareQueueSizeInFrames; }, device); }
 
@@ -569,7 +569,7 @@ namespace asio401 {
 							outputReady = false;
 						}
 
-						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes());
+						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness());
 						std::visit([&](auto& device) { device.FinishWrite(); }, preparedState.asio401.device);
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
 						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
@@ -590,7 +590,7 @@ namespace asio401 {
 				if (mustRead) {
 					if (IsLoggingEnabled()) Log() << "Reading from QA40x";
 					std::visit([&](auto& device) { device.StartRead(readBuffer.data(), readBufferSizeInBytes); }, preparedState.asio401.device);
-					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes());
+					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness());
 				}
 
 				// If the host supports OutputReady then we only need to write one buffer in advance, not two.

@@ -2,6 +2,8 @@
 
 #include "qa40x.h"
 
+#include <dechamps_cpputil/endian.h>
+
 #include <string_view>
 
 namespace asio401 {
@@ -13,6 +15,7 @@ namespace asio401 {
 		enum class SampleRate { KHZ48, KHZ192 };  // According to QuantAsylum, the QA401 only supports these two
 
 		static constexpr auto sampleSizeInBytes = 4;  // 32-bit big endian signed integer. According to QuantAsylum the actual precision is 24 bits.
+		static constexpr auto sampleEndianness = ::dechamps_cpputil::Endianness::BIG;
 		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
 		static constexpr auto inputChannelCount = 2;
 		static constexpr auto outputChannelCount = 2;

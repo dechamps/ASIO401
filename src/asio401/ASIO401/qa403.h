@@ -2,6 +2,8 @@
 
 #include "qa40x.h"
 
+#include <dechamps_cpputil/endian.h>
+
 #include <string_view>
 
 namespace asio401 {
@@ -11,6 +13,7 @@ namespace asio401 {
 	public:
 		// TODO: these have been copy-pasted from QA401 and have not yet been verified empirically on the QA403.
 		static constexpr auto sampleSizeInBytes = 4;  // 32-bit big endian signed integer
+		static constexpr auto sampleEndianness = ::dechamps_cpputil::Endianness::LITTLE;
 		static constexpr auto hardwareQueueSizeInFrames = 1024;
 		static constexpr auto inputChannelCount = 2;
 		static constexpr auto outputChannelCount = 2;

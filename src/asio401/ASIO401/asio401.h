@@ -153,6 +153,7 @@ namespace asio401 {
 
 		long GetDeviceInputChannelCount() const;
 		long GetDeviceOutputChannelCount() const;
+		::dechamps_cpputil::Endianness GetDeviceSampleEndianness() const;
 		size_t GetDeviceSampleSizeInBytes() const;
 		size_t GetHardwareQueueSizeInFrames() const;
 
