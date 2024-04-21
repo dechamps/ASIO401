@@ -153,8 +153,6 @@ namespace asio401 {
 			}
 		}
 
-		constexpr GUID qa401DeviceGUID = { 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } };
-
 		constexpr ASIOSampleType sampleType = ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::BIG ? ASIOSTInt32MSB : ASIOSTInt32LSB;
 		using NativeSampleType = int32_t;
 		static_assert(sizeof(NativeSampleType) == QA401::sampleSizeInBytes);
@@ -198,6 +196,15 @@ namespace asio401 {
 			}
 		}
 
+		std::string GetDevicePath() {
+			const auto qa401DevicesPaths = GetDevicesPaths({ 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } });
+			const auto qa403DevicesPaths = GetDevicesPaths({ 0x5512825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x82, 0x13 } });
+			if (qa401DevicesPaths.size() + qa401DevicesPaths.size() > 1) throw ASIOException(ASE_NotPresent, "more than one QA40x device was found. Multiple devices are not supported.");
+			if (!qa403DevicesPaths.empty()) throw ASIOException(ASE_NotPresent, "QA403 is not supported (yet!)");
+			if (!qa401DevicesPaths.empty()) return *qa401DevicesPaths.begin();
+			throw ASIOException(ASE_NotPresent, "QA40x USB device not found. Is it connected?");
+		}
+
 	}
 
 	ASIO401::ASIO401(void* sysHandle) :
@@ -206,16 +213,7 @@ namespace asio401 {
 		const auto config = LoadConfig();
 		if (!config.has_value()) throw ASIOException(ASE_HWMalfunction, "could not load ASIO401 configuration. See ASIO401 log for details.");
 		return *config;
-	}()), qa401([&] {
-		const auto devicesPaths = GetDevicesPaths(qa401DeviceGUID);
-		if (devicesPaths.empty()) {
-			throw ASIOException(ASE_NotPresent, "QA401 USB device not found. Is it connected?");
-		}
-		if (devicesPaths.size() > 1) {
-			throw ASIOException(ASE_NotPresent, "more than one QA401 device was found. Multiple devices are not supported.");
-		}
-		return *devicesPaths.begin();
-	}()) {
+	}()), qa401(GetDevicePath()) {
 		Log() << "sysHandle = " << sysHandle;
 	}
 
