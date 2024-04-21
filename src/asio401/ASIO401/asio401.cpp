@@ -29,6 +29,11 @@ namespace asio401 {
 
 	namespace {
 
+		template<class... Functors>
+		struct overloaded final : Functors... { using Functors::operator()...; };
+		template<class... Functors>
+		overloaded(Functors...) -> overloaded<Functors...>;
+
 		class Win32HighResolutionTimer {
 		public:
 			Win32HighResolutionTimer() {
@@ -103,59 +108,59 @@ namespace asio401 {
 			return result;
 		}
 
-		void CopyToQA401Buffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, void* const qa401Buffer) {
+		void CopyToQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, void* const qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (bufferInfo.isInput) continue;
 
 				const auto channelNum = bufferInfo.channelNum;
-				assert(channelNum < QA401::outputChannelCount);
-				const auto channelOffset = (channelNum + 1) % QA401::outputChannelCount;  // https://github.com/dechamps/ASIO401/issues/13
+				assert(channelNum < channelCount);
+				const auto channelOffset = (channelNum + 1) % channelCount;  // https://github.com/dechamps/ASIO401/issues/13
 				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(static_cast<uint8_t*>(qa401Buffer) + (QA401::outputChannelCount * sampleCount + channelOffset) * QA401::sampleSizeInBytes, buffer + sampleCount * QA401::sampleSizeInBytes, QA401::sampleSizeInBytes);
+					memcpy(static_cast<uint8_t*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, buffer + sampleCount * sampleSizeInBytes, sampleSizeInBytes);
 			}
 		}
 
-		void CopyFromQA401Buffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const void* const qa401Buffer) {
+		void CopyFromQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const void* const qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!bufferInfo.isInput) continue;
 
 				const auto channelNum = bufferInfo.channelNum;
-				assert(channelNum < QA401::inputChannelCount);
-				const auto channelOffset = (channelNum + 1) % QA401::outputChannelCount;  // https://github.com/dechamps/ASIO401/issues/13
+				assert(channelNum < channelCount);
+				const auto channelOffset = (channelNum + 1) % channelCount;  // https://github.com/dechamps/ASIO401/issues/13
 				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(buffer + sampleCount * QA401::sampleSizeInBytes, static_cast<const uint8_t*>(qa401Buffer) + (QA401::inputChannelCount * sampleCount + channelOffset) * QA401::sampleSizeInBytes, QA401::sampleSizeInBytes);
+					memcpy(buffer + sampleCount * sampleSizeInBytes, static_cast<const uint8_t*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, sampleSizeInBytes);
 			}
 		}
 
-		void ConvertQA401Endianness(void* const buffer, size_t bytes) {
+		void ConvertQA40xEndianness(void* const buffer, size_t bytes, const size_t sampleSizeInBytes) {
 			if constexpr (::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::BIG) return;
+
+			assert(sampleSizeInBytes == 4);
 
 			// Potential optimization opportunity: there are probably faster ways to do this, e.g. using a bswap intrinsic.
 			uint8_t* byteBuffer = static_cast<uint8_t*>(buffer);
 			while (bytes > 0) {
-				static_assert(QA401::sampleSizeInBytes == 4);
 				std::swap(byteBuffer[0], byteBuffer[3]);
 				std::swap(byteBuffer[1], byteBuffer[2]);
 
-				byteBuffer += QA401::sampleSizeInBytes;
-				bytes -= QA401::sampleSizeInBytes;
+				byteBuffer += sampleSizeInBytes;
+				bytes -= sampleSizeInBytes;
 			}
 		}
 
-		void ConvertASIOBufferEndianness(const std::vector<ASIOBufferInfo>& bufferInfos, const bool isInput, const long doubleBufferIndex, const size_t bufferSizeInFrames) {
+		void ConvertASIOBufferEndianness(const std::vector<ASIOBufferInfo>& bufferInfos, const bool isInput, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!!bufferInfo.isInput != isInput) continue;
-				ConvertQA401Endianness(bufferInfo.buffers[doubleBufferIndex], bufferSizeInFrames * 4);
+				ConvertQA40xEndianness(bufferInfo.buffers[doubleBufferIndex], bufferSizeInFrames * 4, sampleSizeInBytes);
 			}
 		}
 
 		constexpr ASIOSampleType sampleType = ::dechamps_cpputil::endianness == ::dechamps_cpputil::Endianness::BIG ? ASIOSTInt32MSB : ASIOSTInt32LSB;
 		using NativeSampleType = int32_t;
-		static_assert(sizeof(NativeSampleType) == QA401::sampleSizeInBytes);
 
 		std::optional<QA401::SampleRate> GetQA401SampleRate(ASIOSampleRate sampleRate) {
 			return ::dechamps_cpputil::Find(sampleRate, std::initializer_list<std::pair<ASIOSampleType, QA401::SampleRate>>{
@@ -174,7 +179,7 @@ namespace asio401 {
 			std::transform(buffer, buffer + count, buffer, std::negate());
 		}
 
-		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames) {
+		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (bufferInfo.isInput) continue;
 
@@ -182,11 +187,11 @@ namespace asio401 {
 				NegateIntegerBuffer(static_cast<NativeSampleType*>(bufferInfo.buffers[doubleBufferIndex]), bufferSizeInFrames);
 			}
 
-			ConvertASIOBufferEndianness(bufferInfos, false, doubleBufferIndex, bufferSizeInFrames);
+			ConvertASIOBufferEndianness(bufferInfos, false, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes);
 		}
 
-		void PostProcessASIOInputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames) {
-			ConvertASIOBufferEndianness(bufferInfos, true, doubleBufferIndex, bufferSizeInFrames);
+		void PostProcessASIOInputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes) {
+			ConvertASIOBufferEndianness(bufferInfos, true, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes);
 
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!bufferInfo.isInput) continue;
@@ -196,15 +201,15 @@ namespace asio401 {
 			}
 		}
 
-		std::string GetDevicePath() {
-			const auto qa401DevicesPaths = GetDevicesPaths({ 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } });
-			const auto qa403DevicesPaths = GetDevicesPaths({ 0x5512825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x82, 0x13 } });
-			if (qa401DevicesPaths.size() + qa401DevicesPaths.size() > 1) throw ASIOException(ASE_NotPresent, "more than one QA40x device was found. Multiple devices are not supported.");
-			if (!qa403DevicesPaths.empty()) throw ASIOException(ASE_NotPresent, "QA403 is not supported (yet!)");
-			if (!qa401DevicesPaths.empty()) return *qa401DevicesPaths.begin();
-			throw ASIOException(ASE_NotPresent, "QA40x USB device not found. Is it connected?");
-		}
+	}
 
+	ASIO401::Device ASIO401::GetDevice() {
+		const auto qa401DevicesPaths = GetDevicesPaths({ 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } });
+		const auto qa403DevicesPaths = GetDevicesPaths({ 0x5512825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x82, 0x13 } });
+		if (qa401DevicesPaths.size() + qa403DevicesPaths.size() > 1) throw ASIOException(ASE_NotPresent, "more than one QA40x device was found. Multiple devices are not supported.");
+		if (!qa401DevicesPaths.empty()) return Device(std::in_place_type<QA401>, *qa401DevicesPaths.begin());
+		if (!qa403DevicesPaths.empty()) return Device(std::in_place_type<QA403>, *qa403DevicesPaths.begin());
+		throw ASIOException(ASE_NotPresent, "QA40x USB device not found. Is it connected?");
 	}
 
 	ASIO401::ASIO401(void* sysHandle) :
@@ -213,7 +218,7 @@ namespace asio401 {
 		const auto config = LoadConfig();
 		if (!config.has_value()) throw ASIOException(ASE_HWMalfunction, "could not load ASIO401 configuration. See ASIO401 log for details.");
 		return *config;
-	}()), qa401(GetDevicePath()) {
+	}()), device(GetDevice()) {
 		Log() << "sysHandle = " << sysHandle;
 	}
 
@@ -229,9 +234,9 @@ namespace asio401 {
 			// Mostly arbitrary; based on the size of a single USB bulk transfer packet
 			bufferSizes.minimum = 64;
 
-			// At 48 kHz, keep the QA401 hardware queue filled at all times; good tradeoff between reliability and latency
+			// At 48 kHz, keep the QA40x hardware queue filled at all times; good tradeoff between reliability and latency
 			// Above 48 kHz, increase the suggested buffer size proportionally in an attempt to alleviate scheduling/processing timing constraints
-			bufferSizes.preferred = long(qa401.hardwareQueueSizeInFrames * (std::max)(sampleRate / 48000, 1.0));
+			bufferSizes.preferred = long(GetHardwareQueueSizeInFrames() * (std::max)(sampleRate / 48000, 1.0));
 
 			// Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
 			bufferSizes.maximum = 32768;
@@ -252,10 +257,15 @@ namespace asio401 {
 		Log() << "Returning: min buffer size " << *minSize << ", max buffer size " << *maxSize << ", preferred buffer size " << *preferredSize << ", granularity " << *granularity;
 	}
 
+	long ASIO401::GetDeviceInputChannelCount() const { return std::visit([](const auto& device) { return device.inputChannelCount; }, device);  }
+	long ASIO401::GetDeviceOutputChannelCount() const { return std::visit([](const auto& device) { return device.outputChannelCount; }, device); }
+	size_t ASIO401::GetDeviceSampleSizeInBytes() const { return std::visit([](const auto& device) { return device.sampleSizeInBytes; }, device); }
+	size_t ASIO401::GetHardwareQueueSizeInFrames() const { return std::visit([](const auto& device) { return device.hardwareQueueSizeInFrames; }, device); }
+
 	void ASIO401::GetChannels(long* numInputChannels, long* numOutputChannels)
 	{
-		*numInputChannels = qa401.inputChannelCount;
-		*numOutputChannels = qa401.outputChannelCount;
+		*numInputChannels = GetDeviceInputChannelCount();
+		*numOutputChannels = GetDeviceOutputChannelCount();
 		Log() << "Returning " << *numInputChannels << " input channels and " << *numOutputChannels << " output channels";
 	}
 
@@ -266,11 +276,11 @@ namespace asio401 {
 		Log() << "Channel info requested for " << (info->isInput ? "input" : "output") << " channel " << info->channel;
 		if (info->isInput)
 		{
-			if (info->channel < 0 || info->channel >= qa401.inputChannelCount) throw ASIOException(ASE_InvalidParameter, "no such input channel");
+			if (info->channel < 0 || info->channel >= GetDeviceInputChannelCount()) throw ASIOException(ASE_InvalidParameter, "no such input channel");
 		}
 		else
 		{
-			if (info->channel < 0 || info->channel >= qa401.outputChannelCount) throw ASIOException(ASE_InvalidParameter, "no such output channel");
+			if (info->channel < 0 || info->channel >= GetDeviceOutputChannelCount()) throw ASIOException(ASE_InvalidParameter, "no such output channel");
 		}
 
 		info->isActive = preparedState.has_value() && preparedState->IsChannelActive(info->isInput, info->channel);
@@ -289,7 +299,10 @@ namespace asio401 {
 	bool ASIO401::CanSampleRate(ASIOSampleRate sampleRate)
 	{
 		Log() << "Checking for sample rate: " << sampleRate;
-		return GetQA401SampleRate(sampleRate).has_value();
+		return std::visit(overloaded{
+			[&](QA401&) { return GetQA401SampleRate(sampleRate).has_value(); },
+			[&](QA403&) { return sampleRate == QA403::sampleRate; }
+		}, device);
 	}
 
 	void ASIO401::GetSampleRate(ASIOSampleRate* sampleRateResult)
@@ -359,7 +372,7 @@ namespace asio401 {
 		buffers(
 			2,
 			GetBufferInfosChannelCount(asioBufferInfos, numChannels, true), GetBufferInfosChannelCount(asioBufferInfos, numChannels, false),
-			bufferSizeInFrames, asio401.qa401.sampleSizeInBytes, asio401.qa401.sampleSizeInBytes),
+			bufferSizeInFrames, asio401.GetDeviceSampleSizeInBytes(), asio401.GetDeviceSampleSizeInBytes()),
 		bufferInfos([&] {
 		std::vector<ASIOBufferInfo> bufferInfos;
 		bufferInfos.reserve(numChannels);
@@ -370,12 +383,12 @@ namespace asio401 {
 			ASIOBufferInfo& asioBufferInfo = asioBufferInfos[channelIndex];
 			if (asioBufferInfo.isInput)
 			{
-				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.qa401.inputChannelCount)
+				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.GetDeviceInputChannelCount())
 					throw ASIOException(ASE_InvalidParameter, "out of bounds input channel in createBuffers() buffer info");
 			}
 			else
 			{
-				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.qa401.outputChannelCount)
+				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.GetDeviceOutputChannelCount())
 					throw ASIOException(ASE_InvalidParameter, "out of bounds output channel in createBuffers() buffer info");
 			}
 			const auto getBuffer = asioBufferInfo.isInput ? &Buffers::GetInputBuffer : &Buffers::GetOutputBuffer;
@@ -431,8 +444,9 @@ namespace asio401 {
 			*outputLatency += bufferSizeInFrames;
 		}
 		if (outputOnly && !config.forceRead) {
-			Log() << qa401.hardwareQueueSizeInFrames << " samples added to output latency due to write-only mode";
-			*outputLatency += qa401.hardwareQueueSizeInFrames;
+			const auto hardwareQueueSizeInFrames = GetHardwareQueueSizeInFrames();
+			Log() << hardwareQueueSizeInFrames << " samples added to output latency due to write-only mode";
+			*outputLatency += long(hardwareQueueSizeInFrames);
 		}
 		Log() << "Returning input latency of " << *inputLatency << " samples and output latency of " << *outputLatency << " samples";
 	}
@@ -481,12 +495,10 @@ namespace asio401 {
 			} catch (...) {}
 		};
 
-		const auto qa401SampleRate = *GetQA401SampleRate(sampleRate);
-
-		const auto writeFrameSizeInBytes = preparedState.asio401.qa401.outputChannelCount * preparedState.buffers.outputSampleSizeInBytes;
-		const auto readFrameSizeInBytes = preparedState.asio401.qa401.inputChannelCount * preparedState.buffers.inputSampleSizeInBytes;
+		const auto writeFrameSizeInBytes = preparedState.asio401.GetDeviceOutputChannelCount() * preparedState.buffers.outputSampleSizeInBytes;
+		const auto readFrameSizeInBytes = preparedState.asio401.GetDeviceInputChannelCount() * preparedState.buffers.inputSampleSizeInBytes;
 		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
-		const auto firstReadBufferSizeInBytes = preparedState.asio401.qa401.hardwareQueueSizeInFrames * readFrameSizeInBytes;
+		const auto firstReadBufferSizeInBytes = preparedState.asio401.GetHardwareQueueSizeInFrames() * readFrameSizeInBytes;
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
 		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInFrames * readFrameSizeInBytes;
 		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
@@ -498,29 +510,41 @@ namespace asio401 {
 		AvrtHighPriority avrtHighPriority;
 
 		try {
-			// Note: the input high pass filter is not configurable, because there's no clear use case for disabling it.
-			// If you can think of one, feel free to reopen https://github.com/dechamps/ASIO401/issues/7.
-			preparedState.asio401.qa401.Reset(
-				QA401::InputHighPassFilterState::ENGAGED,
-				preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED,
-				qa401SampleRate
-			);
+			std::visit(overloaded{
+				[&](QA401& qa401) {
+					// Note: the input high pass filter is not configurable, because there's no clear use case for disabling it.
+					// If you can think of one, feel free to reopen https://github.com/dechamps/ASIO401/issues/7.
+					qa401.Reset(
+						QA401::InputHighPassFilterState::ENGAGED,
+						preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED,
+						*GetQA401SampleRate(sampleRate)
+					);
+				},
+				[&](QA403& qa403) {
+					// TODO: surface the fact that the QA403 does not support the same options as the QA401
+					qa403.Reset();
+				}
+			}, preparedState.asio401.device);
 
 			if (preparedState.buffers.inputChannelCount > 0) {
-				// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
-				// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
-				// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
-				//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
-				//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
-				preparedState.asio401.qa401.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
-				// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
-				// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
-				// Starting streaming that way as a few interesting consequences:
-				//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
-				//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
-				preparedState.asio401.qa401.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
-				preparedState.asio401.qa401.FinishWrite();
-				preparedState.asio401.qa401.FinishRead();
+				std::visit([&](auto& device) {
+					// TODO: this logic was designed for the QA401 - verify that it still makes sense for the QA403.
+
+					// The first frames read from the QA40x shortly after Reset() will always be silence, so throw them away.
+					// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA40x is actually recording silence in real time.)
+					// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA40x read instead for two reasons:
+					//  - Using the QA40x clock for this is probably more accurate and more reliable than the CPU clock.
+					//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
+					device.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+					// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
+					// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA40x will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
+					// Starting streaming that way as a few interesting consequences:
+					//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
+					//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA40x input queue gives us (otherwise we would have a much bigger problem, anyway).
+					device.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+					device.FinishWrite();
+					device.FinishRead();
+				}, preparedState.asio401.device);
 			}
 
 			const auto mustRead = preparedState.buffers.inputChannelCount > 0 || preparedState.asio401.config.forceRead;
@@ -533,8 +557,8 @@ namespace asio401 {
 				// If no output channels are enabled, then skip writing to increase efficiency and reliability.
 				// Note: we can skip this because we already did a dummy write above, which started the hardware. Otherwise the reads would block forever.
 				if (preparedState.buffers.outputChannelCount > 0) {
-					// On the first iteration, we can't start playing a real signal just yet because the QA401 write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
-					// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA401 write queue will be in a stable state and we can queue a real signal behind the silence.
+					// On the first iteration, we can't start playing a real signal just yet because the QA40x write queue is empty at this point (see above), which means it could underrun (glitch) while the write is taking place.
+					// So instead we just send a buffer of silence, which will "hide" any glitches; that will guarantee that on the next iteration the QA40x write queue will be in a stable state and we can queue a real signal behind the silence.
 					if (!firstIteration) {
 						if (hostSupportsOutputReady) {
 							std::unique_lock outputReadyLock(outputReadyMutex);
@@ -545,28 +569,28 @@ namespace asio401 {
 							outputReady = false;
 						}
 
-						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
-						preparedState.asio401.qa401.FinishWrite();
-						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA401";
-						CopyToQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data());
+						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes());
+						std::visit([&](auto& device) { device.FinishWrite(); }, preparedState.asio401.device);
+						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
+						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
 					}
-					preparedState.asio401.qa401.StartWrite(writeBuffer.data(), writeBufferSizeInBytes);
+					std::visit([&](auto& device) { device.StartWrite(writeBuffer.data(), writeBufferSizeInBytes); }, preparedState.asio401.device);
 				}
 
 				if (hostSupportsOutputReady) driverBufferIndex = (driverBufferIndex + 1) % 2;
 				
-				if (!firstIteration && mustRead) preparedState.asio401.qa401.FinishRead();
+				if (!firstIteration && mustRead) std::visit([&](auto& device) { device.FinishRead(); }, preparedState.asio401.device);
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 				if (!firstIteration) {
 					if (preparedState.buffers.inputChannelCount > 0) {
-						if (IsLoggingEnabled()) Log() << "Received data from QA401 for buffer index " << driverBufferIndex;
-						CopyFromQA401Buffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data());
+						if (IsLoggingEnabled()) Log() << "Received data from QA40x for buffer index " << driverBufferIndex;
+						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
 					}
 				}
 				if (mustRead) {
-					if (IsLoggingEnabled()) Log() << "Reading from QA401";
-					preparedState.asio401.qa401.StartRead(readBuffer.data(), readBufferSizeInBytes);
-					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames);
+					if (IsLoggingEnabled()) Log() << "Reading from QA40x";
+					std::visit([&](auto& device) { device.StartRead(readBuffer.data(), readBufferSizeInBytes); }, preparedState.asio401.device);
+					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes());
 				}
 
 				// If the host supports OutputReady then we only need to write one buffer in advance, not two.
@@ -596,7 +620,10 @@ namespace asio401 {
 
 				if (!hostSupportsOutputReady) driverBufferIndex = (driverBufferIndex + 1) % 2;
 
-				preparedState.asio401.qa401.Ping();
+				std::visit(overloaded{
+					[&](QA401& qa401) { qa401.Ping(); },
+					[&](auto&) {}
+				}, preparedState.asio401.device);
 				firstIteration = false;
 			}
 		}
@@ -610,15 +637,22 @@ namespace asio401 {
 		}
 
 		try {
-			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
-			preparedState.asio401.qa401.Reset(QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, qa401SampleRate);
+			std::visit(overloaded{
+				[&](QA401& qa401) {
+					// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
+					qa401.Reset(
+						QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, *GetQA401SampleRate(sampleRate)
+					);
+				},
+				[&](QA403& qa403) { qa403.Reset();  }
+			}, preparedState.asio401.device);
 		}
 		catch (const std::exception& exception) {
-			Log() << "Fatal error occurred while attempting to reset the QA401: " << exception.what();
+			Log() << "Fatal error occurred while attempting to reset the QA40x: " << exception.what();
 			requestReset();
 		}
 		catch (...) {
-			Log() << "Unknown fatal error occurred while attempting to reset the QA401";
+			Log() << "Unknown fatal error occurred while attempting to reset the QA40x";
 			requestReset();
 		}
 	}

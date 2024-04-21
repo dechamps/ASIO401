@@ -77,12 +77,19 @@ target_link_libraries(ASIO401_qa401
 	PRIVATE ASIO401_log
 )
 
+add_library(ASIO401_qa403 STATIC EXCLUDE_FROM_ALL qa403.cpp)
+target_link_libraries(ASIO401_qa403
+	PUBLIC ASIO401_qa40x
+	PRIVATE ASIO401_log
+)
+
 add_library(ASIO401_asio401 STATIC EXCLUDE_FROM_ALL asio401.cpp)
 target_link_libraries(ASIO401_asio401
 	PUBLIC dechamps_ASIOUtil::asiosdk_asioh
 	PUBLIC dechamps_ASIOUtil::asiosdk_asiosys
 	PUBLIC ASIO401_config
 	PUBLIC ASIO401_qa401
+	PUBLIC ASIO401_qa403
 	PRIVATE dechamps_ASIOUtil::asio
 	PRIVATE ASIO401_devices
 	PRIVATE ASIO401_log

@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "qa401.h"
+#include "qa403.h"
 
 #include <dechamps_ASIOUtil/asiosdk/asiosys.h>
 #include <dechamps_ASIOUtil/asiosdk/asio.h>
@@ -13,6 +14,7 @@
 #include <stdexcept>
 #include <mutex>
 #include <thread>
+#include <variant>
 #include <vector>
 
 namespace asio401 {
@@ -49,6 +51,8 @@ namespace asio401 {
 		void ControlPanel();
 
 	private:
+		using Device = std::variant<QA401, QA403>;
+
 		class PreparedState {
 		public:
 			PreparedState(ASIO401& asio401, ASIOBufferInfo* asioBufferInfos, long numChannels, long bufferSizeInFrames, ASIOCallbacks* callbacks);
@@ -147,6 +151,11 @@ namespace asio401 {
 			std::optional<RunningState> ownedRunningState;
 		};
 
+		long GetDeviceInputChannelCount() const;
+		long GetDeviceOutputChannelCount() const;
+		size_t GetDeviceSampleSizeInBytes() const;
+		size_t GetHardwareQueueSizeInFrames() const;
+
 		struct BufferSizes {
 			long minimum;
 			long maximum;
@@ -157,9 +166,11 @@ namespace asio401 {
 
 		void ComputeLatencies(long* inputLatency, long* outputLatency, long bufferSizeInFrames, bool outputOnly) const;
 
+		static Device GetDevice();
+
 		const HWND windowHandle = nullptr;
 		const Config config;
-		QA401 qa401;
+		Device device;
 
 		ASIOSampleRate sampleRate = 48000;
 		bool sampleRateWasAccessed = false;
