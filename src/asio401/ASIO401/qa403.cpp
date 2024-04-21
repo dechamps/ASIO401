@@ -11,6 +11,13 @@ namespace asio401 {
 		Log() << "Resetting QA403";
 
 		qa40x.AbortIO();
+
+		// Reset the hardware. This is especially important in case of a previous unclean stop,
+		// where the hardware could be left in an inconsistent state.
+		qa40x.WriteRegister(8, 0);
+		// Wait for a bit before setting the register again, otherwise it looks like the hardware
+		// "skips past" the zero state (some kind of ABA problem?)
+		::Sleep(50);
 		qa40x.WriteRegister(8, 5);
 
 		Log() << "QA403 is reset";
