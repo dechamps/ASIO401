@@ -207,11 +207,14 @@ namespace asio401 {
 		if (!config.has_value()) throw ASIOException(ASE_HWMalfunction, "could not load ASIO401 configuration. See ASIO401 log for details.");
 		return *config;
 	}()), qa401([&] {
-		const auto devicePath = GetDevicePath(qa401DeviceGUID);
-		if (!devicePath.has_value()) {
+		const auto devicesPaths = GetDevicesPaths(qa401DeviceGUID);
+		if (devicesPaths.empty()) {
 			throw ASIOException(ASE_NotPresent, "QA401 USB device not found. Is it connected?");
 		}
-		return *devicePath;
+		if (devicesPaths.size() > 1) {
+			throw ASIOException(ASE_NotPresent, "more than one QA401 device was found. Multiple devices are not supported.");
+		}
+		return *devicesPaths.begin();
 	}()) {
 		Log() << "sysHandle = " << sysHandle;
 	}

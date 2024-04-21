@@ -2,9 +2,9 @@
 
 #include <rpc.h>
 
-#include <optional>
 #include <string>
+#include <unordered_set>
 
 namespace asio401 {
-	std::optional<std::string> GetDevicePath(const GUID& guid);
+	std::unordered_set<std::string> GetDevicesPaths(const GUID& guid);
 }
