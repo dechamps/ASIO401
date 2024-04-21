@@ -118,22 +118,11 @@ namespace asio401 {
 		}
 	}
 
-	void WinUsbOverlappedIO::Forget() {
-		Log() << "Forgetting about WinUSB overlapped I/O " << &state->overlapped;
-		if (!state.has_value()) throw std::runtime_error("Attempted to forget already empty WinUSB overlapped I/O");
-		if (::ResetEvent(state->overlapped.hEvent) == 0) {
-			const auto error = GetWindowsErrorString(GetLastError());
-			Log() << "Unable to reset event for WinUSB overlapped I/O " << &state->overlapped << ": " << error;
-			throw std::runtime_error("Unable to reset event in WinUSB overlapped I/O");
-		}
-		state.reset();
-	}
-
 	WinUsbOverlappedIO::~WinUsbOverlappedIO() {
 		if (state.has_value()) abort();
 	}
 
-	void WinUsbOverlappedIO::Wait() {
+	void WinUsbOverlappedIO::Wait(bool tolerateAborted) {
 		if (IsLoggingEnabled()) Log() << "Waiting for WinUSB overlapped I/O " << &state->overlapped << " to complete";
 		ValidateOverlapped(state->overlapped);
 
@@ -145,6 +134,12 @@ namespace asio401 {
 		if (::ResetEvent(state->overlapped.hEvent) == 0) resetEventError = GetLastError();
 		
 		if (getOverlappedResultError.has_value()) {
+			if (tolerateAborted && *getOverlappedResultError == ERROR_OPERATION_ABORTED) {
+				if (IsLoggingEnabled()) Log() << "WinUSB overlapped I/O " << &state->overlapped << " aborted as expected";
+				state.reset();
+				return;
+			}
+
 			const auto error = GetWindowsErrorString(*getOverlappedResultError);
 			Log() << "WinUSB overlapped I/O " << &state->overlapped << " failed: " << error;
 			throw std::runtime_error("WinUSB overlapped  I/O failed: " + error);

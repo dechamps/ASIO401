@@ -55,7 +55,13 @@ namespace asio401 {
 		}
 		for (const auto overlappedIO : { &readIO, &writeIO, &registerIO }) {
 			if (!overlappedIO->has_value()) continue;
-			(*overlappedIO)->Forget();
+			// It is not clear if we really need to get the overlapped result after an abort. WinUsb_AbortPipe() states
+			// "this is a synchronous operation", which would seem to suggest the overlapped operation is done and we
+			// could just forget about it. It's not clear if this is really the case though, and general Windows I/O
+			// rules would normally require us to wait for cancelled operations to complete before we can clean up the
+			// overlapped state. Given the ambiguity, let's err on the safe side and await the overlapped operation -
+			// there are no real downsides to doing that anyway.
+			(*overlappedIO)->Wait(/*tolerateAborted=*/true);
 			overlappedIO->reset();
 		}
 	}

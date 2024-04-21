@@ -46,8 +46,7 @@ namespace asio401 {
 			return *this;
 		}
 
-		void Forget();
-		void Wait();
+		void Wait(bool tolerateAborted = false);
 
 	private:
 		struct State {
