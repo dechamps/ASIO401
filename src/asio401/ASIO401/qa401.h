@@ -1,8 +1,7 @@
 #pragma once
 
-#include "winusb.h"
+#include "qa40x.h"
 
-#include <array>
 #include <string_view>
 
 namespace asio401 {
@@ -20,7 +19,6 @@ namespace asio401 {
 		static constexpr auto readPaddingInFrames = 64;  // Number of frames in the first read that can be a remnant of the previous stream, and should be ignored. See https://github.com/dechamps/ASIO401/issues/5
 		
 		QA401(std::string_view devicePath);
-		~QA401() { AbortIO(); }
 
 		// Note that there is no Start() call. Technically we could implement one by writing 5 into register 4 but that has rather nasty side effects. See https://github.com/dechamps/ASIO401/issues/9
 		// Instead we do that register write in Reset(), and exploit the fact that the QA401 won't actually start streaming until the first write is sent. See https://github.com/dechamps/ASIO401/issues/10
@@ -33,36 +31,8 @@ namespace asio401 {
 		void Ping();
 
 	private:
-		class RegisterWriteRequest {
-		public:
-			constexpr RegisterWriteRequest(uint8_t registerNumber, uint32_t value);
-
-			const void* data() const { return request.data(); }
-			size_t size() const { return request.size(); }
-
-			uint8_t getRegisterNumber() const;
-			uint32_t getValue() const;
-
-		private:
-			std::array<uint8_t, 5> request;
-		};
-
-		void Validate();
-
-		void WriteRegister(uint8_t registerNumber, uint32_t value);
-		WinUsbOverlappedIO WriteRegister(const RegisterWriteRequest& request, OVERLAPPED& overlapped);
-
-		void AbortIO();
-
-		WinUsbHandle winUsb;
-
-		WindowsOverlappedEvent readOverlapped;
-		WindowsOverlappedEvent writeOverlapped;
-		WindowsOverlappedEvent pingOverlapped;
-
-		std::optional<WinUsbOverlappedIO> readIO;
-		std::optional<WinUsbOverlappedIO> writeIO;
-		std::optional<WinUsbOverlappedIO> pingIO;
+		QA40x qa40x;
+		bool pinging = false;
 	};
 
 }
