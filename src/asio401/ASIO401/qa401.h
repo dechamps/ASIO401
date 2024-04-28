@@ -19,7 +19,6 @@ namespace asio401 {
 		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
 		static constexpr auto inputChannelCount = 2;
 		static constexpr auto outputChannelCount = 2;
-		static constexpr auto readPaddingInFrames = 64;  // Number of frames in the first read that can be a remnant of the previous stream, and should be ignored. See https://github.com/dechamps/ASIO401/issues/5
 		
 		QA401(std::string_view devicePath);
 
