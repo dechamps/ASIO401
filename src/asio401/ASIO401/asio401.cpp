@@ -497,7 +497,10 @@ namespace asio401 {
 
 		const auto writeFrameSizeInBytes = preparedState.asio401.GetDeviceOutputChannelCount() * preparedState.buffers.outputSampleSizeInBytes;
 		const auto readFrameSizeInBytes = preparedState.asio401.GetDeviceInputChannelCount() * preparedState.buffers.inputSampleSizeInBytes;
-		const auto firstWriteBufferSizeInBytes = 1 * writeFrameSizeInBytes;
+		const auto firstWriteBufferSizeInBytes = std::visit(overloaded{
+			[&](QA401&) { return 1; },
+			[&](QA403&) { return QA403::hardwareQueueSizeInFrames; }
+		}, preparedState.asio401.device) * writeFrameSizeInBytes;
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.GetHardwareQueueSizeInFrames() * readFrameSizeInBytes;
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
 		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInFrames * readFrameSizeInBytes;
@@ -527,23 +530,39 @@ namespace asio401 {
 			}, preparedState.asio401.device);
 
 			if (preparedState.buffers.inputChannelCount > 0) {
-				std::visit([&](auto& device) {
-					// TODO: this logic was designed for the QA401 - verify that it still makes sense for the QA403.
-
-					// The first frames read from the QA40x shortly after Reset() will always be silence, so throw them away.
-					// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA40x is actually recording silence in real time.)
-					// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA40x read instead for two reasons:
-					//  - Using the QA40x clock for this is probably more accurate and more reliable than the CPU clock.
-					//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
-					device.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
-					// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
-					// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA40x will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
-					// Starting streaming that way as a few interesting consequences:
-					//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
-					//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA40x input queue gives us (otherwise we would have a much bigger problem, anyway).
-					device.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
-					device.FinishWrite();
-					device.FinishRead();
+				// The priming logic is identical between the QA401 and QA403 (aside from the size of the first write).
+				// However this is mostly just a coincidence - the reasons why priming is done in this particular way are actually very different between the two devices.
+				// This is why the code below is the same for both devices, but the explanatory comments are very different.
+				std::visit(overloaded{
+					[&](QA401& qa401) {
+						// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
+						// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
+						// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
+						//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
+						//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
+						qa401.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+						// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
+						// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
+						// Starting streaming that way as a few interesting consequences:
+						//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
+						//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
+						qa401.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+						qa401.FinishWrite();
+						qa401.FinishRead();
+					},
+					[&](QA403& qa403) {
+						// The QA403 will only actually start streaming if we fill its output queue first - if we don't, reads will block forever.
+						// We could just start sending it actual output data, but there are scenarios in which that won't work, e.g. if only input channels are used, or if the ASIO buffer size is lower than the QA403 queue size.
+						// So instead, we just fill the output queue with silence to force the hardware to actually start streaming.
+						qa403.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+						// We don't want to queue real buffers at this point, because they would have to wait in line behind the silence we just wrote, resulting in extra output latency.
+						// Instead, we want to deliberalely drain the output queue. The most straightforward way to do that is to wait for the same amount of samples to be recorded (read).
+						// Note this will *de facto* trigger an output buffer underrun in the hardware. We work around this by sending silence as the next buffer (see below).
+						// TODO: this forces the user to wait for 512 frames (the size of the QA403 queue) before streaming starts. We could do better than this by putting actual output data at the end of that first priming write, and reading actual input data off the end of this first priming read. We're only talking ~10 ms though (assuming 48 kHz, the lowest supported sample rate) so it may not be worth the extra code complexity?
+						qa403.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+						qa403.FinishWrite();
+						qa403.FinishRead();
+					}
 				}, preparedState.asio401.device);
 			}
 
