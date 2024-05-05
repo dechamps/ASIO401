@@ -514,6 +514,7 @@ namespace asio401 {
 				[&](QA403& qa403) {
 					// TODO: surface the fact that the QA403 does not support the same options as the QA401
 					qa403.Reset();
+					qa403.Start();
 				});
 
 			if (preparedState.buffers.inputChannelCount > 0) {

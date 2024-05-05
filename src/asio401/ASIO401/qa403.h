@@ -21,6 +21,7 @@ namespace asio401 {
 		QA403(std::string_view devicePath);
 
 		void Reset();  // TODO: set parameters
+		void Start();
 		void StartWrite(const void* buffer, size_t size);
 		void FinishWrite();
 		void StartRead(void* buffer, size_t size);

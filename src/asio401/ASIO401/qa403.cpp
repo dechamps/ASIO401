@@ -18,9 +18,12 @@ namespace asio401 {
 		// Wait for a bit before setting the register again, otherwise it looks like the hardware
 		// "skips past" the zero state (some kind of ABA problem?)
 		::Sleep(50);
-		qa40x.WriteRegister(8, 5);
 
 		Log() << "QA403 is reset";
+	}
+
+	void QA403::Start() {
+		qa40x.WriteRegister(8, 5);
 	}
 
 	void QA403::StartWrite(const void* buffer, size_t size) {
