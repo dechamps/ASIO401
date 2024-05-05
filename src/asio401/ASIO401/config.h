@@ -6,7 +6,8 @@
 namespace asio401 {
 
 	struct Config {
-		bool attenuator = true;
+		std::optional<double> fullScaleInputLevelDBV;
+		std::optional<double> fullScaleOutputLevelDBV;
 		std::optional<int64_t> bufferSizeSamples;
 		bool forceRead = false;
 	};

@@ -87,9 +87,18 @@ namespace asio401 {
 		}
 
 		void SetConfig(const toml::Table& table, Config& config) {
-			SetOption(table, "attenuator", config.attenuator);
+			std::optional<bool> attenuator;
+			SetOption(table, "attenuator", attenuator);
+			SetOption(table, "fullScaleInputLevelDBV", config.fullScaleInputLevelDBV);
+			SetOption(table, "fullScaleOutputLevelDBV", config.fullScaleOutputLevelDBV);
 			SetOption(table, "bufferSizeSamples", config.bufferSizeSamples, ValidateBufferSize);
 			SetOption(table, "forceRead", config.forceRead);
+
+			if (attenuator.has_value()) {
+				if (config.fullScaleInputLevelDBV.has_value())
+					throw std::runtime_error("Options 'attenuator' and 'fullScaleInputLevelDBV' cannot be specified at the same time");
+				config.fullScaleInputLevelDBV = *attenuator ? +26.0 : +6.0;
+			}
 		}
 
 	}

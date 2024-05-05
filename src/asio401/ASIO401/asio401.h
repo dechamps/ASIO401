@@ -165,6 +165,8 @@ namespace asio401 {
 		size_t GetDeviceSampleSizeInBytes() const { return WithDevice([](const auto& device) { return device.sampleSizeInBytes; }); }
 		size_t GetHardwareQueueSizeInFrames() const { return WithDevice([](const auto& device) { return device.hardwareQueueSizeInFrames; }); }
 
+		void ValidateConfig() const;
+
 		struct BufferSizes {
 			long minimum;
 			long maximum;

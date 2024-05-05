@@ -168,6 +168,62 @@ namespace asio401 {
 			{192000, QA401::SampleRate::KHZ192},
 		};
 
+		QA401::AttenuatorState GetQA401AttenuatorState(const Config& config) {
+			const auto fullScaleInputLevelDBV = config.fullScaleInputLevelDBV.value_or(+26.0);
+			const auto attenuatorState = ::dechamps_cpputil::Find(
+				fullScaleInputLevelDBV,
+				std::initializer_list<std::pair<double, QA401::AttenuatorState>>{
+					{ +6.0, QA401::AttenuatorState::DISENGAGED },
+					{ +26.0, QA401::AttenuatorState::ENGAGED },
+				}
+			);
+			if (!attenuatorState.has_value())
+				throw std::runtime_error("Full scale input level of " + std::to_string(fullScaleInputLevelDBV) + " dBV is not supported by the QA401. Valid values for the QA401 are +6.0 and +26.0");
+			return *attenuatorState;
+		}
+
+		void ValidateQA401FullScaleOutputLevel(const Config& config) {
+			const auto fullScaleOutputLevelDBV = config.fullScaleOutputLevelDBV;
+			if (fullScaleOutputLevelDBV.has_value() && *fullScaleOutputLevelDBV != +5.5)
+				throw std::runtime_error("Full scale output level of " + std::to_string(*fullScaleOutputLevelDBV) + " dBV is not supported by the QA401. The only valid value for the QA401 is +5.5");
+		}
+
+		QA403::FullScaleInputLevel GetQA403FullScaleInputLevel(const Config& config) {
+			const auto fullScaleInputLevelDBV = config.fullScaleInputLevelDBV.value_or(+42.0);
+			const auto fullScaleInputLevel = ::dechamps_cpputil::Find(
+				fullScaleInputLevelDBV,
+				std::initializer_list<std::pair<double, QA403::FullScaleInputLevel>>{
+					{ 0.0, QA403::FullScaleInputLevel::DBV0 },
+					{ +6.0, QA403::FullScaleInputLevel::DBV6 },
+					{ +12.0, QA403::FullScaleInputLevel::DBV12 },
+					{ +18.0, QA403::FullScaleInputLevel::DBV18 },
+					{ +24.0, QA403::FullScaleInputLevel::DBV24 },
+					{ +30.0, QA403::FullScaleInputLevel::DBV30 },
+					{ +36.0, QA403::FullScaleInputLevel::DBV36 },
+					{ +42.0, QA403::FullScaleInputLevel::DBV42 },
+			}
+			);
+			if (!fullScaleInputLevel.has_value())
+				throw std::runtime_error("Full scale input level of " + std::to_string(fullScaleInputLevelDBV) + " dBV is not supported by the QA403. Valid values for the QA403 are 0.0, +6.0, +12.0, +18.0, +24.0, +30.0, +36.0 and +42.0");
+			return *fullScaleInputLevel;
+		}
+
+		QA403::FullScaleOutputLevel GetQA403FullScaleOutputLevel(const Config& config) {
+			const auto fullScaleOutputLevelDBV = config.fullScaleOutputLevelDBV.value_or(-12.0);
+			const auto fullScaleOutputLevel = ::dechamps_cpputil::Find(
+				fullScaleOutputLevelDBV,
+				std::initializer_list<std::pair<double, QA403::FullScaleOutputLevel>>{
+					{ -12.0, QA403::FullScaleOutputLevel::DBVn12 },
+					{ -2.0, QA403::FullScaleOutputLevel::DBVn2 },
+					{ +8.0, QA403::FullScaleOutputLevel::DBV8 },
+					{ +18.0, QA403::FullScaleOutputLevel::DBV18 },
+			}
+			);
+			if (!fullScaleOutputLevel.has_value())
+				throw std::runtime_error("Full scale output level of " + std::to_string(fullScaleOutputLevelDBV) + " dBV is not supported by the QA403. Valid values for the QA403 are -12.0, -2.0, +8.0 and +18.0");
+			return *fullScaleOutputLevel;
+		}
+
 		template <typename Integer> void NegateIntegerBuffer(Integer* buffer, size_t count) {
 			std::replace(buffer, buffer + count, (std::numeric_limits<Integer>::min)(), (std::numeric_limits<Integer>::min)() + 1);
 			std::transform(buffer, buffer + count, buffer, std::negate());
@@ -214,6 +270,19 @@ namespace asio401 {
 		return *config;
 	}()), device(GetDevice()) {
 		Log() << "sysHandle = " << sysHandle;
+		ValidateConfig();
+	}
+
+	void ASIO401::ValidateConfig() const {
+		WithDevice(
+			[&](const QA401&) {
+				GetQA401AttenuatorState(config);
+				ValidateQA401FullScaleOutputLevel(config);
+			},
+			[&](const QA403&) {
+				GetQA403FullScaleInputLevel(config);
+				GetQA403FullScaleOutputLevel(config);
+			});
 	}
 
 	ASIO401::BufferSizes ASIO401::ComputeBufferSizes() const
@@ -507,13 +576,15 @@ namespace asio401 {
 					// If you can think of one, feel free to reopen https://github.com/dechamps/ASIO401/issues/7.
 					qa401.Reset(
 						QA401::InputHighPassFilterState::ENGAGED,
-						preparedState.asio401.config.attenuator ? QA401::AttenuatorState::ENGAGED : QA401::AttenuatorState::DISENGAGED,
+						GetQA401AttenuatorState(preparedState.asio401.config),
 						*GetQA401SampleRate(sampleRate)
 					);
 				},
 				[&](QA403& qa403) {
-					// TODO: surface the fact that the QA403 does not support the same options as the QA401
-					qa403.Reset();
+					// TODO configure sample rate
+					qa403.Reset(
+						GetQA403FullScaleInputLevel(preparedState.asio401.config),
+						GetQA403FullScaleOutputLevel(preparedState.asio401.config));
 					qa403.Start();
 				});
 
@@ -632,7 +703,10 @@ namespace asio401 {
 						QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, *GetQA401SampleRate(sampleRate)
 					);
 				},
-				[&](QA403& qa403) { qa403.Reset();  });
+				[&](QA403& qa403) {
+					// Re-engage the attenuators just to be safe.
+					qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12);
+				});
 		}
 		catch (const std::exception& exception) {
 			Log() << "Fatal error occurred while attempting to reset the QA40x: " << exception.what();

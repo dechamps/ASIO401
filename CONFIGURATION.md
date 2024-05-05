@@ -31,37 +31,52 @@ about what went wrong.
 ## Example configuration file
 
 ```toml
-attenuator = false
+fullScaleInputLevelDBV = +18.0
+fullScaleOutputLevelDBV = -2.0
 bufferSizeSamples = 512
 ```
 
 ## Options reference
 
-### Option `attenuator`
+### Option `fullScaleInputLevelDBV`
 
-*Boolean*-typed option that determines if the QA401 hardware attenuator should
-be engaged or not.
+*Floating point*-typed option that determines the QA40x input voltage that maps
+to full scale sample values (i.e. the maximum input level), in dBV. Also
+controls the hardware input attenuator.
 
-If the option is set to `true`, the QA401 attenuator will stay engaged.
+**QA403 only:** the allowed values are `0.0`, `+6.0`, `+12.0`, `+18.0`, `+24.0`,
+`+30.0`, `+36.0` and `+42.0`. Values below `24.0` will disengage the hardware
+input attenuator.
 
-If the option is set to `false`, the QA401 attenuator will be bypassed during
-audio streaming.
-
-Note that, contrary to the QuantAsylum Analyzer application, ASIO401 will not
-adjust sample values in any way to account for the presence or absence of the
-attenuator. In other words, defeating the attenuator has the effect of adding
-20 dB to the samples coming from ASIO401.
-
-**CAUTION:** do not apply high voltages to the QA401 inputs while the attenuator
-is bypassed. See the QA401 User Manual for details.
+**QA401 only:** the allowed values are `+6.0` and `+26.0`. A value of `+6.0`
+will disengage the attenuator. **CAUTION:** do not apply high voltages to the
+QA401 inputs while the attenuator is bypassed. See the QA401 User Manual for
+details.
 
 Example:
 
 ```toml
-attenuator = false
+fullScaleInputLevelDBV = +6.0
 ```
 
-The default behaviour is to keep the attenuator engaged.
+The default value is `+42.0` for the QA403 and `+26.0` for the QA401.
+
+### Option `fullScaleOutputLevelDBV`
+
+*Floating point*-typed option that determines which QA40x output voltage full
+scale sample values map to (i.e. the maximum output level), in dBV.
+
+**QA403 only:** the allowed values are `-12.0`, `-2.0`, `8.0` and `18.0`.
+
+**QA401 only:** the only allowed value is `5.5`.
+
+Example:
+
+```toml
+fullScaleOutputLevelDBV = +8.0
+```
+
+The default value is `-12.0` for the QA403 and `5.5` for the QA401.
 
 ### Option `bufferSizeSamples`
 
@@ -144,6 +159,13 @@ forceRead = true
 ```
 
 The default value is `false`.
+
+### (DEPRECATED) Option `attenuator`
+
+**Deprecated, use `maxInputLevelDBV` instead.**
+
+*Boolean*-typed option that is equivalent to setting `maxInputLevelDBV` to `6`
+if set to `false`, or `26` if set to `true`.
 
 ---
 
