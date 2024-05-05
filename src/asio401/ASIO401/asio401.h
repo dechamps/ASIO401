@@ -122,6 +122,7 @@ namespace asio401 {
 				};
 
 				void RunThread() noexcept;
+				void BufferSwitch(long driverBufferIndex, SamplePosition currentSamplePosition);
 
 				PreparedState& preparedState;
 				const ASIOSampleRate sampleRate;

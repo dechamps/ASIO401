@@ -603,23 +603,7 @@ namespace asio401 {
 				if (!(firstIteration && hostSupportsOutputReady)) {
 					if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 					samplePosition = currentSamplePosition;
-
-					if (!host_supports_timeinfo) {
-						if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
-						preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
-						if (IsLoggingEnabled()) Log() << "bufferSwitch() complete";
-					}
-					else {
-						ASIOTime time = { 0 };
-						time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
-						time.timeInfo.samplePosition = currentSamplePosition.samples;
-						time.timeInfo.systemTime = currentSamplePosition.timestamp;
-						time.timeInfo.sampleRate = sampleRate;
-						if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
-						const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
-						if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
-					}
-
+					BufferSwitch(driverBufferIndex, currentSamplePosition);
 					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 				}
 
@@ -656,6 +640,24 @@ namespace asio401 {
 		catch (...) {
 			Log() << "Unknown fatal error occurred while attempting to reset the QA40x";
 			requestReset();
+		}
+	}
+
+	void ASIO401::PreparedState::RunningState::RunningState::BufferSwitch(long driverBufferIndex, SamplePosition currentSamplePosition) {
+		if (!host_supports_timeinfo) {
+			if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitch() callback with buffer index: " << driverBufferIndex;
+			preparedState.callbacks.bufferSwitch(long(driverBufferIndex), ASIOTrue);
+			if (IsLoggingEnabled()) Log() << "bufferSwitch() complete";
+		}
+		else {
+			ASIOTime time = { 0 };
+			time.timeInfo.flags = kSystemTimeValid | kSamplePositionValid | kSampleRateValid;
+			time.timeInfo.samplePosition = currentSamplePosition.samples;
+			time.timeInfo.systemTime = currentSamplePosition.timestamp;
+			time.timeInfo.sampleRate = sampleRate;
+			if (IsLoggingEnabled()) Log() << "Firing ASIO bufferSwitchTimeInfo() callback with buffer index: " << driverBufferIndex << ", time info: (" << ::dechamps_ASIOUtil::DescribeASIOTime(time) << ")";
+			const auto timeResult = preparedState.callbacks.bufferSwitchTimeInfo(&time, long(driverBufferIndex), ASIOTrue);
+			if (IsLoggingEnabled()) Log() << "bufferSwitchTimeInfo() complete, returned time info: " << (timeResult == nullptr ? "none" : ::dechamps_ASIOUtil::DescribeASIOTime(*timeResult));
 		}
 	}
 
