@@ -151,11 +151,18 @@ namespace asio401 {
 			std::optional<RunningState> ownedRunningState;
 		};
 
-		long GetDeviceInputChannelCount() const;
-		long GetDeviceOutputChannelCount() const;
-		::dechamps_cpputil::Endianness GetDeviceSampleEndianness() const;
-		size_t GetDeviceSampleSizeInBytes() const;
-		size_t GetHardwareQueueSizeInFrames() const;
+		template<class... Functors>
+		struct overloaded final : Functors... { using Functors::operator()...; };
+		template <class... Functors>
+		auto WithDevice(Functors... functors) const { return std::visit(overloaded<Functors...>{functors...}, device); }
+		template <class... Functors>
+		auto WithDevice(Functors... functors) { return std::visit(overloaded<Functors...>{functors...}, device); }
+
+		long GetDeviceInputChannelCount() const { return WithDevice([](const auto& device) { return device.inputChannelCount; }); }
+		long GetDeviceOutputChannelCount() const { return WithDevice([](const auto& device) { return device.outputChannelCount; }); }
+		::dechamps_cpputil::Endianness GetDeviceSampleEndianness() const { return WithDevice([](const auto& device) { return device.sampleEndianness; }); }
+		size_t GetDeviceSampleSizeInBytes() const { return WithDevice([](const auto& device) { return device.sampleSizeInBytes; }); }
+		size_t GetHardwareQueueSizeInFrames() const { return WithDevice([](const auto& device) { return device.hardwareQueueSizeInFrames; }); }
 
 		struct BufferSizes {
 			long minimum;
