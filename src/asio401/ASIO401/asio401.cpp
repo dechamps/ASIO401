@@ -261,9 +261,18 @@ namespace asio401 {
 		const auto qa402DevicesPaths = GetDevicesPaths({ 0x2232825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x88, 0x59 } });
 		const auto qa403DevicesPaths = GetDevicesPaths({ 0x5512825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x82, 0x13 } });
 		if (qa401DevicesPaths.size() + qa402DevicesPaths.size() + qa403DevicesPaths.size() > 1) throw ASIOException(ASE_NotPresent, "more than one QA40x device was found. Multiple devices are not supported.");
-		if (!qa401DevicesPaths.empty()) return Device(std::in_place_type<QA401>, *qa401DevicesPaths.begin());
-		if (!qa402DevicesPaths.empty()) return Device(std::in_place_type<QA403>, *qa402DevicesPaths.begin());
-		if (!qa403DevicesPaths.empty()) return Device(std::in_place_type<QA403>, *qa403DevicesPaths.begin());
+		if (!qa401DevicesPaths.empty()) {
+			Log() << "Found QA401 device";
+			return Device(std::in_place_type<QA401>, *qa401DevicesPaths.begin());
+		}
+		if (!qa402DevicesPaths.empty()) {
+			Log() << "Found QA402 device";
+			return Device(std::in_place_type<QA403>, *qa402DevicesPaths.begin());
+		}
+		if (!qa403DevicesPaths.empty()) {
+			Log() << "Found QA403 device";
+			return Device(std::in_place_type<QA403>, *qa403DevicesPaths.begin());
+		}
 		throw ASIOException(ASE_NotPresent, "QA40x USB device not found. Is it connected?");
 	}
 
