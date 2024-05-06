@@ -163,11 +163,6 @@ namespace asio401 {
 			});
 		}
 
-		constexpr std::pair<ASIOSampleRate, QA401::SampleRate> supportedSampleRates[] = {
-			{48000, QA401::SampleRate::KHZ48},
-			{192000, QA401::SampleRate::KHZ192},
-		};
-
 		QA401::AttenuatorState GetQA401AttenuatorState(const Config& config) {
 			const auto fullScaleInputLevelDBV = config.fullScaleInputLevelDBV.value_or(+26.0);
 			const auto attenuatorState = ::dechamps_cpputil::Find(
