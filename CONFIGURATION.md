@@ -45,7 +45,7 @@ to full scale sample values (i.e. the maximum input level), in dBV. Also
 controls the hardware input attenuator.
 
 **QA403/QA402 only:** the allowed values are `0.0`, `+6.0`, `+12.0`, `+18.0`,
-`+24.0`, `+30.0`, `+36.0` and `+42.0`. Values below `24.0` will disengage the
+`+24.0`, `+30.0`, `+36.0` and `+42.0`. Values below `+24.0` will disengage the
 hardware input attenuator.
 
 **QA401 only:** the allowed values are `+6.0` and `+26.0`. A value of `+6.0`
@@ -66,9 +66,10 @@ The default value is `+42.0` for the QA403/QA402 and `+26.0` for the QA401.
 *Floating point*-typed option that determines which QA40x output voltage full
 scale sample values map to (i.e. the maximum output level), in dBV.
 
-**QA403/QA402 only:** the allowed values are `-12.0`, `-2.0`, `8.0` and `18.0`.
+**QA403/QA402 only:** the allowed values are `-12.0`, `-2.0`, `+8.0` and
+`+18.0`.
 
-**QA401 only:** the only allowed value is `5.5`.
+**QA401 only:** the only allowed value is `+5.5`.
 
 Example:
 
@@ -76,7 +77,7 @@ Example:
 fullScaleOutputLevelDBV = +8.0
 ```
 
-The default value is `-12.0` for the QA403/QA402 and `5.5` for the QA401.
+The default value is `-12.0` for the QA403/QA402 and `+5.5` for the QA401.
 
 ### Option `bufferSizeSamples`
 
@@ -164,8 +165,8 @@ The default value is `false`.
 
 **Deprecated, use `maxInputLevelDBV` instead.**
 
-*Boolean*-typed option that is equivalent to setting `maxInputLevelDBV` to `6`
-if set to `false`, or `26` if set to `true`.
+*Boolean*-typed option that is equivalent to setting `maxInputLevelDBV` to
+`+6.0` if set to `false`, or `+26.0` if set to `true`.
 
 ---
 
