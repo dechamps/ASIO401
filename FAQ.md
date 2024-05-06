@@ -101,6 +101,15 @@ two typical causes:
  - A **ASIO401 bug** (or lack of optimization). If you believe that is the case,
    please [file a report][report].
 
+## Is 384 kHz sample rate supported?
+
+Yes, but only on the QA403/QA402, and only for input (recording). If you try to
+use the outputs at 384 kHz, you will get garbage. This is a hardware limitation.
+
+Also note that a 384 kHz sample rate puts a lot of strain on USB thread
+scheduling, greatly increasing the likelihood of glitches - see previous
+section. For this reason, it is best to stick to lower sample rates if possible.
+
 ## What's the deal with DC?
 
 Here are a few things that are worth noting about ASIO401 and [DC][]:
