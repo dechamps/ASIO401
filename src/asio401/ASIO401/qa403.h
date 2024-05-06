@@ -9,6 +9,8 @@
 namespace asio401 {
 	
 	// This class implements the USB protocol described at https://github.com/QuantAsylum/QA40x_BareMetal
+	// Despite the name, this code also work with the QA402 since the protocol is supposed to be identical.
+	// Generally speaking, references to the QA403 throughout ASIO401 code usually apply to the QA402 as well.
 	class QA403 {
 	public:
 		enum class FullScaleInputLevel {

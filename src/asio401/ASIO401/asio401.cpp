@@ -208,7 +208,7 @@ namespace asio401 {
 			}
 			);
 			if (!fullScaleInputLevel.has_value())
-				throw std::runtime_error("Full scale input level of " + std::to_string(fullScaleInputLevelDBV) + " dBV is not supported by the QA403. Valid values for the QA403 are 0.0, +6.0, +12.0, +18.0, +24.0, +30.0, +36.0 and +42.0");
+				throw std::runtime_error("Full scale input level of " + std::to_string(fullScaleInputLevelDBV) + " dBV is not supported by the QA403/QA402. Valid values for the QA403/QA402 are 0.0, +6.0, +12.0, +18.0, +24.0, +30.0, +36.0 and +42.0");
 			return *fullScaleInputLevel;
 		}
 
@@ -224,7 +224,7 @@ namespace asio401 {
 			}
 			);
 			if (!fullScaleOutputLevel.has_value())
-				throw std::runtime_error("Full scale output level of " + std::to_string(fullScaleOutputLevelDBV) + " dBV is not supported by the QA403. Valid values for the QA403 are -12.0, -2.0, +8.0 and +18.0");
+				throw std::runtime_error("Full scale output level of " + std::to_string(fullScaleOutputLevelDBV) + " dBV is not supported by the QA403/QA402. Valid values for the QA403/QA402 are -12.0, -2.0, +8.0 and +18.0");
 			return *fullScaleOutputLevel;
 		}
 
@@ -258,9 +258,11 @@ namespace asio401 {
 
 	ASIO401::Device ASIO401::GetDevice() {
 		const auto qa401DevicesPaths = GetDevicesPaths({ 0xFDA49C5C, 0x7006, 0x4EE9, { 0x88, 0xB2, 0xA0, 0xF8, 0x06, 0x50, 0x81, 0x50 } });
+		const auto qa402DevicesPaths = GetDevicesPaths({ 0x2232825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x88, 0x59 } });
 		const auto qa403DevicesPaths = GetDevicesPaths({ 0x5512825c, 0x1e52, 0x447a, { 0x83, 0xbd, 0xc8, 0x4d, 0xa7, 0xc1, 0x82, 0x13 } });
-		if (qa401DevicesPaths.size() + qa403DevicesPaths.size() > 1) throw ASIOException(ASE_NotPresent, "more than one QA40x device was found. Multiple devices are not supported.");
+		if (qa401DevicesPaths.size() + qa402DevicesPaths.size() + qa403DevicesPaths.size() > 1) throw ASIOException(ASE_NotPresent, "more than one QA40x device was found. Multiple devices are not supported.");
 		if (!qa401DevicesPaths.empty()) return Device(std::in_place_type<QA401>, *qa401DevicesPaths.begin());
+		if (!qa402DevicesPaths.empty()) return Device(std::in_place_type<QA403>, *qa402DevicesPaths.begin());
 		if (!qa403DevicesPaths.empty()) return Device(std::in_place_type<QA403>, *qa403DevicesPaths.begin());
 		throw ASIOException(ASE_NotPresent, "QA40x USB device not found. Is it connected?");
 	}
