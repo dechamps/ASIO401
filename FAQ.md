@@ -39,20 +39,25 @@ doesn't provide many ways of surfacing error details to applications, and many
 applications don't display them anyway. The best way to shed light on what might
 be going on is to inspect the [ASIO401 log][logging].
 
-Remember that **ASIO401 will only work after the [QuantAsylum Analyzer][]
-application has configured the hardware first**. ASIO401 does not know how to do
-that by itself, and relies on the QuantAsylum-provided application to prepare
-the hardware. You will need to do that again every time you power cycle the
-QA401.
+Note that ASIO401 will fail to initialize if another application (such as the
+official QuantAsylum app) is already using the device. The device can only be
+used from one app at a time.
 
-If the [QuantAsylum Analyzer][] application itself doesn't work, you might want
-to double-check that the QA401 is connected. You might want to read the
-Troubleshooting section of the QA401 User Manual. If all else fails, you might
-want to ask [QuantAsylum][] themselves for help, but note that QuantAsylum will
-only provide support for their applications, not ASIO401.
+In the specific case of the QA401, remember that ASIO401 will only work after
+the [QA401 app][] application has configured the hardware first. ASIO401 does
+not know how to do that by itself, and relies on the QuantAsylum-provided
+application to prepare the hardware. You will need to do that again every time
+you power cycle the QA401. This limitation does not apply to the QA403 and QA402
+devices, which should work out of the box.
 
-If the QuantAsylum Analyzer application works, but ASIO401 doesn't, you might
-have found a bug in ASIO401. Feel free to [file a report][report].
+If you are experiencing issues, you may want to try the official app first
+([QA403/QA402 app][], [QA401 app][]). If that doesn't work, you may want to read
+the troubleshooting section of your device's manual. If you can't get the
+official app to work, you may want to ask [QuantAsylum][] themselves for help.
+Note that QuantAsylum will only provide support for their own app, not ASIO401.
+
+If the official app works, but ASIO401 doesn't, you may have found a bug in
+ASIO401. Feel free to [file a report][report].
 
 ## Why am I getting "glitches" (cracks, pops) in the audio?
 
@@ -60,17 +65,17 @@ A more technical term for these is *discontinuities*. They are often caused by
 *buffer overflows* (input) or *buffer underruns* (output). These in turn have
 two typical causes:
 
- - **USB performance issues**: contrary to most audio USB devices, the QA401
+ - **USB performance issues**: contrary to most audio USB devices, the QA40x
    uses bulk, not isochronous, USB transfers, which means it does not reserve
    USB bandwidth and is therefore prone from interference from other USB devices
    sharing the same bus.
-   - It is recommended to keep the QA401 on a dedicated USB root all to itself,
+   - It is recommended to keep the QA40x on a dedicated USB root all to itself,
      with no over devices competing for bandwidth and interrupts.
-   - At **192 kHz** the USB timing constraints become quite severe because the
-     QA401 hardware queue is only 1024 samples long, and therefore needs to be
-     refreshed at least once every 5 milliseconds at 192 kHz. This is true even
-     if the ASIO buffer size is larger than 1024 samples. Stick to 48 kHz if you
-     can.
+   - At **192 kHz and above** the USB timing constraints become quite severe
+     because the QA40x hardware queue is only 1024 samples long, and therefore
+     needs to be refreshed at least once every 5 milliseconds at 192 kHz (2.5
+     milliseconds at 384 kHz). This is true even if the ASIO buffer size is
+     larger than 1024 samples. Stick to lower sample rates if you can.
  - **Expensive processing** is being done in the critical real-time audio
    streaming loop, or the ASIO Host Application real-time streaming path is
    poorly optimized, and the pipeline is unable to keep up.
@@ -103,7 +108,7 @@ Here are a few things that are worth noting about ASIO401 and [DC][]:
  - **The output (playback) path is DC-coupled end-to-end**, and ASIO401 supports
    arbitrary DC offsets in that path.
    - This means that if the ASIO Host Application gives ASIO401 samples that
-     contain a DC offset, that DC offset will appear as-is on the QA401 outputs.
+     contain a DC offset, that DC offset will appear as-is on the QA40x outputs.
    - ASIO401 does not provide a way to configure a fixed DC offset; it assumes
      that the ASIO Host Application will handle that. If this is something you
      think would be useful to have as an ASIO401 configuration option, feel free
@@ -119,17 +124,20 @@ Here are a few things that are worth noting about ASIO401 and [DC][]:
    - To avoid this issue, please ensure that the ASIO Host Application closes
      the ASIO stream properly. This can be verified by looking for the presence
      of a `stop()`  call near the end of the [ASIO401 log][logging].
- - **The input (record) path is AC-coupled** in the QA401 hardware itself.
+   - This issue only seems to affect the QA401. QA403 devices appear
+     unaffected, and will not continue to output DC when abruptly stopped.
+ - **The input (record) path is AC-coupled** in the QA40x hardware itself.
    - In other words, DC offsets on the input cannot be measured using ASIO401.
      This is a hardware limitation.
-   - Note, however, that a very small amount of DC (less than -60 dBFS) will
-     typically linger in the input signal for about 20 seconds after streaming
-     starts if the attenuator is disengaged. This is a [known issue][issue17].
+   - In the case of the QA401, a very small amount of DC (less than -60 dBFS)
+     will typically linger in the input signal for about 20 seconds after
+     streaming starts if the attenuator is disengaged. This is a [known
+     issue][issue17].
  - **Be careful about applying a large DC offset to the QA401 inputs, as it can
    damage the hardware.**
    - This is especially true if the attenuator is disengaged. Make sure the
-     [`attenuator`][attenuator] option is set to true if there is any risk that
-     the QA401 inputs will be exposed to DC.
+     attenuator is engaged if there is any risk that the QA401 inputs will be
+     exposed to DC.
    - See the QA401 User Manual from QuantAsylum for details.
 
 ---
@@ -144,5 +152,6 @@ Here are a few things that are worth noting about ASIO401 and [DC][]:
 [issue17]: https://github.com/dechamps/ASIO401/issues/17
 [logging]: README.md#logging
 [QuantAsylum]: https://github.com/QuantAsylum
-[QuantAsylum Analyzer]: https://github.com/QuantAsylum/QA401/releases
+[QA403/QA402 app]: https://github.com/QuantAsylum/QA40x/releases
+[QA401 app]: https://github.com/QuantAsylum/QA401/releases
 [report]: README.md#reporting-issues-feedback-feature-requests

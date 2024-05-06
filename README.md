@@ -1,4 +1,4 @@
-# ASIO401, the unofficial QA401 ASIO driver
+# ASIO401, the unofficial QA403/QA402/QA401 ASIO driver
 *Brought to you by [Etienne Dechamps][] - [GitHub][]*
 
 *ASIO is a trademark and software of Steinberg Media Technologies GmbH*
@@ -8,10 +8,10 @@
 
 ## Description
 
-This is an unofficial [ASIO][] audio driver for the [QuantAsylum][] [QA401][]
-audio analyzer USB device. This makes it possible to use the QA401 in any
-audio application that supports ASIO, including third-party audio measurement
-software (e.g. [REW][]).
+This is an unofficial [ASIO][] audio driver for the [QuantAsylum][] [QA403][],
+[QA402][] and [QA401][] audio analyzer USB devices. This makes it possible to
+use a QA40x in any audio application that supports ASIO, including third-party
+audio measurement software (e.g. [REW][]).
 
 **DISCLAIMER:** while this driver was developed with the help of QuantAsylum
 (with my thanks to Matt Taylor), it is not officially supported by QuantAsylum.
@@ -19,13 +19,25 @@ Please direct any support requests [to ASIO401][report], not QuantAsylum.
 
 ## Requirements
 
- - A [QA401][] audio analyzer USB device
+ - A [QA403][], [QA402][] or [QA401][] audio analyzer USB device
  - Windows Vista or later
  - Compatible with 32-bit and 64-bit ASIO Host Applications
 
 ## Usage
 
 [Install][releases] ASIO401, then:
+
+### QA403 and QA402
+
+1. Connect the QA403/QA402 to your computer.
+2. Run your ASIO Host Application. ASIO401 should appear in the ASIO driver
+   list.
+
+There is no need to install the official QuantAsylum QA40x app.
+
+To adjust input/output scaling, and other options, see [CONFIGURATION][].
+
+### QA401
 
 1. Connect the QA401 to your computer.
 2. Open the [QuantAsylum Analyzer][] application.
@@ -109,6 +121,8 @@ while the problem is occurring, and attach it to your report. The output of
 [logging]: #logging
 [QuantAsylum]: https://quantasylum.com/
 [QuantAsylum Analyzer]: https://github.com/QuantAsylum/QA401/releases
+[QA403]: https://quantasylum.com/products/qa403-audio-analyzer
+[QA402]: https://quantasylum.com/products/qa402-audio-analyzer
 [QA401]: https://quantasylum.com/products/qa401-audio-analyzer
 [releases]: https://github.com/dechamps/ASIO401/releases
 [report]: #reporting-issues-feedback-feature-requests

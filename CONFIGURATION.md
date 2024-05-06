@@ -44,9 +44,9 @@ bufferSizeSamples = 512
 to full scale sample values (i.e. the maximum input level), in dBV. Also
 controls the hardware input attenuator.
 
-**QA403/QA402 only:** the allowed values are `0.0`, `+6.0`, `+12.0`, `+18.0`, `+24.0`,
-`+30.0`, `+36.0` and `+42.0`. Values below `24.0` will disengage the hardware
-input attenuator.
+**QA403/QA402 only:** the allowed values are `0.0`, `+6.0`, `+12.0`, `+18.0`,
+`+24.0`, `+30.0`, `+36.0` and `+42.0`. Values below `24.0` will disengage the
+hardware input attenuator.
 
 **QA401 only:** the allowed values are `+6.0` and `+26.0`. A value of `+6.0`
 will disengage the attenuator. **CAUTION:** do not apply high voltages to the
@@ -87,21 +87,21 @@ This option can have a major impact on reliability and latency. Smaller buffers
 will reduce latency but will increase the likelihood of glitches/discontinuities
 (buffer overflow/underrun) if the audio pipeline is not fast enough.
 
-The QA401 device can store up to 1024 samples in the hardware itself.
+The QA40x device can store up to 1024 samples in the hardware itself.
 
 On the output (playback) side, ASIO401 always keeps one or two buffers inflight
 at any given time; if the buffer size is larger than half the hardware queue
 size, the excess data is queued on the computer side of the USB connection and
-is streamed progressively as space becomes available in the QA401 hardware
+is streamed progressively as space becomes available in the QA40x hardware
 queue.
 
 On the input (recording) side, ASIO401 always keeps a read request inflight such
-that the QA401 hardware queue is always being drained, and hopefully stays
+that the QA40x hardware queue is always being drained, and hopefully stays
 nearly empty at all times.
 
 At 48 kHz, the best tradeoff between reliability and latency is likely to be
 1024 samples; this ensures there is always some data queued on the USB host side
-to keep the QA401 hardware output queue nearly filled at all times. Smaller
+to keep the QA40x hardware output queue nearly filled at all times. Smaller
 buffers only make sense if you care about latency. Larger buffers will always
 improve reliability and efficiency by relaxing scheduling constraints and
 allowing for more data to be preloaded, but come with diminishing returns.
@@ -128,25 +128,25 @@ a 192 kHz sample rate, the preferred buffer size becomes 4096 samples.
 ### Option `forceRead`
 
 *Boolean*-typed option that determines if ASIO401 will fetch audio data from the
-QA401 for clock synchronization purposes even if no input channels are enabled.
+QA40x for clock synchronization purposes even if no input channels are enabled.
 
 This option only has an effect if the ASIO Host Application exclusively uses
 ASIO401 in the output direction. The value of this option is ignored if any
 input channels are used, since in that case ASIO401 has to read data from the
-QA401 anyway.
+QA40x anyway.
 
 If the option is set to `true` (or the ASIO Host application enables any
 input channels), then ASIO401 will use read operations to monitor the progress
-of the QA401 clock, and will use that information to issue writes at the
+of the QA40x clock, and will use that information to issue writes at the
 appropriate time. This decreases output latency.
 
 If the option is set to `false` (and the ASIO Host application does not enable
 any input channels), then ASIO401 will not issue any read operations, and will
-use write pushback to synchronize with the QA401 clock. This improves efficiency
+use write pushback to synchronize with the QA40x clock. This improves efficiency
 and relaxes performance constraints because USB load is reduced. On top of that,
 the likelihood of glitches (discontinuities) from missed deadlines is reduced
-because the QA401 output queue acts as an additional buffer. However, for the
-same reason, the output latency is increased by the length of the QA401 output
+because the QA40x output queue acts as an additional buffer. However, for the
+same reason, the output latency is increased by the length of the QA40x output
 queue, i.e. 1024 samples.
 
 In general, it does not make sense to enable this option unless you care about
