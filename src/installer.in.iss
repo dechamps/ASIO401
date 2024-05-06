@@ -13,7 +13,7 @@ AppUpdatesURL=https://github.com/dechamps/ASIO401/releases
 AppReadmeFile=https://github.com/dechamps/ASIO401/blob/@DECHAMPS_CMAKEUTILS_GIT_DESCRIPTION@/README.md
 AppContact=etienne@edechamps.fr
 
-DefaultDirName={pf}\ASIO401
+DefaultDirName={commonpf}\ASIO401
 AppendDefaultDirName=no
 ArchitecturesInstallIn64BitMode=x64
 
