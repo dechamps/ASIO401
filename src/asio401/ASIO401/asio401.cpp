@@ -233,12 +233,11 @@ namespace asio401 {
 			std::transform(buffer, buffer + count, buffer, std::negate());
 		}
 
-		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes, ::dechamps_cpputil::Endianness deviceSampleEndianness) {
+		void PreProcessASIOOutputBuffers(const std::vector<ASIOBufferInfo>& bufferInfos, const long doubleBufferIndex, const size_t bufferSizeInFrames, const size_t sampleSizeInBytes, ::dechamps_cpputil::Endianness deviceSampleEndianness, const bool invertPolarity) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (bufferInfo.isInput) continue;
 
-				// Invert polarity of all output channels. See https://github.com/dechamps/ASIO401/issues/14
-				NegateIntegerBuffer(static_cast<NativeSampleType*>(bufferInfo.buffers[doubleBufferIndex]), bufferSizeInFrames);
+				if (invertPolarity) NegateIntegerBuffer(static_cast<NativeSampleType*>(bufferInfo.buffers[doubleBufferIndex]), bufferSizeInFrames);
 			}
 
 			ConvertASIOBufferEndianness(bufferInfos, false, doubleBufferIndex, bufferSizeInFrames, sampleSizeInBytes, deviceSampleEndianness);
@@ -650,7 +649,11 @@ namespace asio401 {
 							outputReady = false;
 						}
 
-						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness());
+						const bool invertPolarity = preparedState.asio401.WithDevice(
+							[&](const QA401&) { return true; }, // https://github.com/dechamps/ASIO401/issues/14
+							[&](const QA403&) { return false; }
+						);
+						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness(), invertPolarity);
 						preparedState.asio401.WithDevice([&](auto& device) { device.FinishWrite(); });
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
 						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
