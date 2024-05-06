@@ -44,11 +44,11 @@ official QuantAsylum app) is already using the device. The device can only be
 used from one app at a time.
 
 In the specific case of the QA401, remember that ASIO401 will only work after
-the [QA401 app][] application has configured the hardware first. ASIO401 does
-not know how to do that by itself, and relies on the QuantAsylum-provided
-application to prepare the hardware. You will need to do that again every time
-you power cycle the QA401. This limitation does not apply to the QA403 and QA402
-devices, which should work out of the box.
+the [QA401 app][] has configured the hardware first. ASIO401 does not know how
+to do that by itself, and relies on the QuantAsylum-provided application to
+prepare the hardware. You will need to do that again every time you power cycle
+the QA401. This limitation does not apply to the QA403 and QA402 devices, which
+should work out of the box.
 
 If you are experiencing issues, you may want to try the official app first
 ([QA403/QA402 app][], [QA401 app][]). If that doesn't work, you may want to read
