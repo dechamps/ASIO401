@@ -107,9 +107,9 @@ buffers only make sense if you care about latency. Larger buffers will always
 improve reliability and efficiency by relaxing scheduling constraints and
 allowing for more data to be preloaded, but come with diminishing returns.
 
-At 192 kHz, it is recommended to use a larger buffer size because 1024 samples
-implies a ~5 ms buffer processing deadline, which is likely too tight for most
-systems, resulting in discontinuities (glitches).
+At higher sample rates, it is recommended to use a larger buffer size due to the
+tigher buffer processing deadlines that could otherwise result in
+discontinuities (glitches).
 
 Note that some host applications might already provide a user-controlled buffer
 size setting; in this case, there should be no need to use this option. It is
@@ -123,8 +123,9 @@ bufferSizeSamples = 512 # ~10.7 ms at 48 kHz
 ```
 
 The default behaviour is to advertise minimum, preferred and maximum buffer
-sizes of 64, 1024 and 32768 samples, respectively. If the application selects
-a 192 kHz sample rate, the preferred buffer size becomes 4096 samples.
+sizes of 64, 1024 and 32768 samples, respectively. If the application selects a
+sample rate higher than 48 kHz, the preferred buffer size is increased
+proportionally.
 
 ### Option `forceRead`
 
