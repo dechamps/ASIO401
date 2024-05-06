@@ -27,6 +27,12 @@ namespace asio401 {
 			DBV8 = 2,
 			DBV18 = 3,
 		};
+		enum class SampleRate {
+			KHZ48 = 0,
+			KHZ96 = 1,
+			KHZ192 = 2,
+			KHZ384 = 3,
+		};
 
 		static constexpr auto sampleSizeInBytes = 4;  // 32-bit big endian signed integer
 		static constexpr auto sampleEndianness = ::dechamps_cpputil::Endianness::LITTLE;
@@ -37,7 +43,7 @@ namespace asio401 {
 		
 		QA403(std::string_view devicePath);
 
-		void Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel);  // TODO: set sample rate
+		void Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate);
 		void Start();
 		void StartWrite(const void* buffer, size_t size);
 		void FinishWrite();

@@ -7,7 +7,7 @@ namespace asio401 {
 	QA403::QA403(std::string_view devicePath) :
 		qa40x(devicePath, /*registerPipeId*/0x01, /*writePipeId*/0x02, /*readPipeId*/0x82) {}
 
-	void QA403::Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel) {
+	void QA403::Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate) {
 		Log() << "Resetting QA403";
 
 		qa40x.AbortIO();
@@ -17,6 +17,8 @@ namespace asio401 {
 		qa40x.WriteRegister(8, 0);
 		qa40x.WriteRegister(5, uint32_t(fullScaleInputLevel));
 		qa40x.WriteRegister(6, uint32_t(fullScaleOutputLevel));
+		// QuantAsylum did not publicly document sample rate setting, this is from private correspondence with them.
+		qa40x.WriteRegister(9, uint32_t(sampleRate));
 		// Wait for a bit before setting the register again, otherwise it looks like the hardware
 		// "skips past" the zero state (some kind of ABA problem?)
 		::Sleep(50);

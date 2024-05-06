@@ -163,6 +163,15 @@ namespace asio401 {
 			});
 		}
 
+		std::optional<QA403::SampleRate> GetQA403SampleRate(ASIOSampleRate sampleRate) {
+			return ::dechamps_cpputil::Find(sampleRate, std::initializer_list<std::pair<ASIOSampleType, QA403::SampleRate>>{
+				{ 48000, QA403::SampleRate::KHZ48 },
+				{ 96000, QA403::SampleRate::KHZ96 },
+				{ 192000, QA403::SampleRate::KHZ192 },
+				{ 384000, QA403::SampleRate::KHZ384 },
+			});
+		}
+
 		QA401::AttenuatorState GetQA401AttenuatorState(const Config& config) {
 			const auto fullScaleInputLevelDBV = config.fullScaleInputLevelDBV.value_or(+26.0);
 			const auto attenuatorState = ::dechamps_cpputil::Find(
@@ -354,7 +363,7 @@ namespace asio401 {
 		Log() << "Checking for sample rate: " << sampleRate;
 		return WithDevice(
 			[&](QA401&) { return GetQA401SampleRate(sampleRate).has_value(); },
-			[&](QA403&) { return sampleRate == QA403::sampleRate; });
+			[&](QA403&) { return GetQA403SampleRate(sampleRate).has_value(); });
 	}
 
 	void ASIO401::GetSampleRate(ASIOSampleRate* sampleRateResult)
@@ -576,10 +585,10 @@ namespace asio401 {
 					);
 				},
 				[&](QA403& qa403) {
-					// TODO configure sample rate
 					qa403.Reset(
 						GetQA403FullScaleInputLevel(preparedState.asio401.config),
-						GetQA403FullScaleOutputLevel(preparedState.asio401.config));
+						GetQA403FullScaleOutputLevel(preparedState.asio401.config),
+						*GetQA403SampleRate(sampleRate));
 					qa403.Start();
 				});
 
@@ -700,7 +709,7 @@ namespace asio401 {
 				},
 				[&](QA403& qa403) {
 					// Re-engage the attenuators just to be safe.
-					qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12);
+					qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12, QA403::SampleRate::KHZ48);
 				});
 		}
 		catch (const std::exception& exception) {
