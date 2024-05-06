@@ -117,13 +117,13 @@ namespace asio401 {
 			}
 		}
 
-		void CopyFromQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const void* const qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes) {
+		void CopyFromQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const void* const qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes, const bool swapChannels) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!bufferInfo.isInput) continue;
 
 				const auto channelNum = bufferInfo.channelNum;
 				assert(channelNum < channelCount);
-				const auto channelOffset = (channelNum + 1) % channelCount;  // https://github.com/dechamps/ASIO401/issues/13
+				const auto channelOffset = swapChannels ? (channelNum + 1) % channelCount : channelNum;
 				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
@@ -665,7 +665,10 @@ namespace asio401 {
 				if (!firstIteration) {
 					if (preparedState.buffers.inputChannelCount > 0) {
 						if (IsLoggingEnabled()) Log() << "Received data from QA40x for buffer index " << driverBufferIndex;
-						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
+						const bool swapChannels = preparedState.asio401.WithDevice(
+							[&](const QA401&) { return true; }, // https://github.com/dechamps/ASIO401/issues/13
+							[&](const QA403&) { return false; });
+						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes(), swapChannels);
 					}
 				}
 				if (mustRead) {
