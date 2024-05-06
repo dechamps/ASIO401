@@ -21,6 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0  # Make sure git describe can find the latest tag for stamping
           submodules: recursive
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -38,6 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0  # Make sure git describe can find the latest tag for stamping
           submodules: recursive
       - uses: actions/download-artifact@v4
         with:
