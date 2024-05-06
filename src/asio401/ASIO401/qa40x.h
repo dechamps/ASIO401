@@ -9,7 +9,7 @@ namespace asio401 {
 
 	class QA40x {
 	public:
-		QA40x(std::string_view devicePath, UCHAR registerPipeId, UCHAR writePipeId, UCHAR readPipeId);
+		QA40x(std::string_view devicePath, UCHAR registerPipeId, UCHAR writePipeId, UCHAR readPipeId, bool requiresApp);
 		~QA40x() { AbortIO(); }
 
 		void StartWriteRegister(uint8_t registerNumber, uint32_t value);
@@ -25,7 +25,7 @@ namespace asio401 {
 		void AbortIO();
 
 	private:
-		void Validate();
+		void Validate(bool requiresApp);
 
 		const UCHAR registerPipeId;
 		const UCHAR writePipeId;

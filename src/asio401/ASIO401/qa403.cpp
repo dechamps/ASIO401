@@ -5,7 +5,7 @@
 namespace asio401 {
 
 	QA403::QA403(std::string_view devicePath) :
-		qa40x(devicePath, /*registerPipeId*/0x01, /*writePipeId*/0x02, /*readPipeId*/0x82) {}
+		qa40x(devicePath, /*registerPipeId*/0x01, /*writePipeId*/0x02, /*readPipeId*/0x82, /*requiresApp*/false) {}
 
 	void QA403::Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate) {
 		Log() << "Resetting QA403";

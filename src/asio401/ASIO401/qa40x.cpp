@@ -12,13 +12,13 @@
 
 namespace asio401 {
 
-	QA40x::QA40x(std::string_view devicePath, UCHAR registerPipeId, UCHAR writePipeId, UCHAR readPipeId) :
+	QA40x::QA40x(std::string_view devicePath, UCHAR registerPipeId, UCHAR writePipeId, UCHAR readPipeId, const bool requiresApp) :
 		registerPipeId(registerPipeId), writePipeId(writePipeId), readPipeId(readPipeId),
 		winUsb(WinUsbOpen(devicePath)) {
-		Validate();
+		Validate(requiresApp);
 	}
 
-	void QA40x::Validate() {
+	void QA40x::Validate(const bool requiresApp) {
 		Log() << "Querying QA40x USB interface descriptor";
 		USB_INTERFACE_DESCRIPTOR usbInterfaceDescriptor = { 0 };
 		if (WinUsb_QueryInterfaceSettings(winUsb.InterfaceHandle(), 0, &usbInterfaceDescriptor) != TRUE) {
@@ -27,7 +27,10 @@ namespace asio401 {
 
 		Log() << "Number of endpoints: " << int(usbInterfaceDescriptor.bNumEndpoints);
 		if (usbInterfaceDescriptor.bNumEndpoints == 0) {
-			throw std::runtime_error("No USB endpoints - did you run the QuantAsylum Analyzer app first to configure the hardware?");
+			throw std::runtime_error(
+				requiresApp ?
+				"No USB endpoints - did you run the QuantAsylum Analyzer app first to configure the hardware?" :
+				"No USB endpoints");
 		}
 
 		std::set<UCHAR> missingPipeIds = { registerPipeId, writePipeId, readPipeId };

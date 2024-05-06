@@ -5,7 +5,7 @@
 namespace asio401 {
 
 	QA401::QA401(std::string_view devicePath) :
-		qa40x(devicePath, /*registerPipeId*/0x02, /*writePipeId*/0x04, /*readPipeId*/0x88) {}
+		qa40x(devicePath, /*registerPipeId*/0x02, /*writePipeId*/0x04, /*readPipeId*/0x88, /*requiresApp*/true) {}
 
 	void QA401::Reset(InputHighPassFilterState inputHighPassFilterState, AttenuatorState attenuatorState, SampleRate sampleRate) {
 		Log() << "Resetting QA401 with attenuator " << (attenuatorState == AttenuatorState::DISENGAGED ? "disengaged" : "engaged") << " and sample rate " << (sampleRate == SampleRate::KHZ48 ? "48 kHz" : "192 kHz");
