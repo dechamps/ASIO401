@@ -54,6 +54,9 @@ namespace asio401 {
 		Log() << "Aborting all QA40x I/O";
 
 		for (const auto& pipeId : { registerPipeId, writePipeId, readPipeId }) {
+			// According to some sources, it would be a good idea to also call WinUsb_ResetPipe() here, as otherwise WinUsb_AbortPipe() may hang, e.g.:
+			//   https://android.googlesource.com/platform/development/+/487b1deae9082ff68833adf9eb47d57557f8bf16/host/windows/usb/winusb/adb_winusb_endpoint_object.cpp#66
+			// However in practice, if we implement this suggestion, and the process is abruptly terminated, then the next instance will hang on the first read from the read pipe! No idea why...
 			WinUsbAbort(winUsb.InterfaceHandle(), pipeId);
 		}
 		for (const auto overlappedIO : { &readIO, &writeIO, &registerIO }) {
