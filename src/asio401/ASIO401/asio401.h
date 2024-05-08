@@ -122,6 +122,8 @@ namespace asio401 {
 				};
 
 				void RunThread() noexcept;
+				void SetupDevice();
+				void TearDownDevice();
 				void BufferSwitch(long driverBufferIndex, SamplePosition currentSamplePosition);
 
 				PreparedState& preparedState;

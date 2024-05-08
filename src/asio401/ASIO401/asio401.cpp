@@ -584,23 +584,7 @@ namespace asio401 {
 		AvrtHighPriority avrtHighPriority;
 
 		try {
-			preparedState.asio401.WithDevice(
-				[&](QA401& qa401) {
-					// Note: the input high pass filter is not configurable, because there's no clear use case for disabling it.
-					// If you can think of one, feel free to reopen https://github.com/dechamps/ASIO401/issues/7.
-					qa401.Reset(
-						QA401::InputHighPassFilterState::ENGAGED,
-						GetQA401AttenuatorState(preparedState.asio401.config),
-						*GetQA401SampleRate(sampleRate)
-					);
-				},
-				[&](QA403& qa403) {
-					qa403.Reset(
-						GetQA403FullScaleInputLevel(preparedState.asio401.config),
-						GetQA403FullScaleOutputLevel(preparedState.asio401.config),
-						*GetQA403SampleRate(sampleRate));
-					qa403.Start();
-				});
+			SetupDevice();
 
 			if (preparedState.buffers.inputChannelCount > 0) {
 				// The priming logic is identical between the QA401 and QA403 (aside from the size of the first write).
@@ -718,25 +702,49 @@ namespace asio401 {
 		}
 
 		try {
-			preparedState.asio401.WithDevice([&](QA401& qa401) {
-					// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
-					qa401.Reset(
-						QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, *GetQA401SampleRate(sampleRate)
-					);
-				},
-				[&](QA403& qa403) {
-					// Re-engage the attenuators just to be safe.
-					qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12, QA403::SampleRate::KHZ48);
-				});
+			TearDownDevice();
 		}
 		catch (const std::exception& exception) {
-			Log() << "Fatal error occurred while attempting to reset the QA40x: " << exception.what();
+			Log() << "Fatal error occurred while attempting to tear down the QA40x: " << exception.what();
 			requestReset();
 		}
 		catch (...) {
-			Log() << "Unknown fatal error occurred while attempting to reset the QA40x";
+			Log() << "Unknown fatal error occurred while attempting to tear down the QA40x";
 			requestReset();
 		}
+	}
+
+	void ASIO401::PreparedState::RunningState::RunningState::SetupDevice() {
+		preparedState.asio401.WithDevice(
+			[&](QA401& qa401) {
+				// Note: the input high pass filter is not configurable, because there's no clear use case for disabling it.
+				// If you can think of one, feel free to reopen https://github.com/dechamps/ASIO401/issues/7.
+				qa401.Reset(
+					QA401::InputHighPassFilterState::ENGAGED,
+					GetQA401AttenuatorState(preparedState.asio401.config),
+					*GetQA401SampleRate(sampleRate)
+				);
+			},
+			[&](QA403& qa403) {
+				qa403.Reset(
+					GetQA403FullScaleInputLevel(preparedState.asio401.config),
+					GetQA403FullScaleOutputLevel(preparedState.asio401.config),
+					*GetQA403SampleRate(sampleRate));
+				qa403.Start();
+			});
+	}
+
+	void ASIO401::PreparedState::RunningState::RunningState::TearDownDevice() {
+		preparedState.asio401.WithDevice([&](QA401& qa401) {
+			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
+			qa401.Reset(
+				QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, *GetQA401SampleRate(sampleRate)
+			);
+			},
+			[&](QA403& qa403) {
+				// Re-engage the attenuators just to be safe.
+				qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12, QA403::SampleRate::KHZ48);
+			});
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::BufferSwitch(long driverBufferIndex, SamplePosition currentSamplePosition) {
