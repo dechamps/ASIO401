@@ -110,10 +110,10 @@ namespace asio401 {
 				const auto channelNum = bufferInfo.channelNum;
 				assert(channelNum < channelCount);
 				const auto channelOffset = (channelNum + 1) % channelCount;  // https://github.com/dechamps/ASIO401/issues/13
-				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(static_cast<uint8_t*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, buffer + sampleCount * sampleSizeInBytes, sampleSizeInBytes);
+					memcpy(static_cast<std::byte*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, buffer + sampleCount * sampleSizeInBytes, sampleSizeInBytes);
 			}
 		}
 
@@ -124,10 +124,10 @@ namespace asio401 {
 				const auto channelNum = bufferInfo.channelNum;
 				assert(channelNum < channelCount);
 				const auto channelOffset = swapChannels ? (channelNum + 1) % channelCount : channelNum;
-				const auto buffer = static_cast<uint8_t*>(bufferInfo.buffers[doubleBufferIndex]);
+				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(buffer + sampleCount * sampleSizeInBytes, static_cast<const uint8_t*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, sampleSizeInBytes);
+					memcpy(buffer + sampleCount * sampleSizeInBytes, static_cast<const std::byte*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, sampleSizeInBytes);
 			}
 		}
 
@@ -135,7 +135,7 @@ namespace asio401 {
 			assert(sampleSizeInBytes == 4);
 
 			// Potential optimization opportunity: there are probably faster ways to do this, e.g. using a bswap intrinsic.
-			uint8_t* byteBuffer = static_cast<uint8_t*>(buffer);
+			auto byteBuffer = static_cast<std::byte*>(buffer);
 			while (bytes > 0) {
 				std::swap(byteBuffer[0], byteBuffer[3]);
 				std::swap(byteBuffer[1], byteBuffer[2]);
@@ -466,8 +466,8 @@ namespace asio401 {
 			auto& nextBuffersChannelIndex = asioBufferInfo.isInput ? nextBuffersInputChannelIndex : nextBuffersOutputChannelIndex;
 			const auto bufferSizeInBytes = asioBufferInfo.isInput ? buffers.GetInputBufferSizeInBytes() : buffers.GetOutputBufferSizeInBytes();
 
-			uint8_t* first_half = (buffers.*getBuffer)(0, nextBuffersChannelIndex);
-			uint8_t* second_half = (buffers.*getBuffer)(1, nextBuffersChannelIndex);
+			std::byte* first_half = (buffers.*getBuffer)(0, nextBuffersChannelIndex);
+			std::byte* second_half = (buffers.*getBuffer)(1, nextBuffersChannelIndex);
 			++nextBuffersChannelIndex;
 			asioBufferInfo.buffers[0] = first_half;
 			asioBufferInfo.buffers[1] = second_half;
@@ -576,8 +576,8 @@ namespace asio401 {
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
 		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInFrames * readFrameSizeInBytes;
 		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
-		std::vector<uint8_t> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
-		std::vector<uint8_t> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
+		std::vector<std::byte> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
+		std::vector<std::byte> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
 
 		Win32HighResolutionTimer win32HighResolutionTimer;
 		// Note: Reset() calls are done under high priority, because the internal timing of the reset procedure is somewhat important to avoid https://github.com/dechamps/ASIO401/issues/9
