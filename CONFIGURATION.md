@@ -44,6 +44,12 @@ bufferSizeSamples = 512
 to full scale sample values (i.e. the maximum input level), in dBV. Also
 controls the hardware input attenuator.
 
+**Note:** the purpose of this option is to adjust input gain and attenuator
+settings. The value entered here is NOT calibrated. The true full scale input
+voltage may deviate from this setting by several dB, and therefore should not be
+used for accurate absolute input voltage readings. If that's what you're after,
+you will want to do your own separate calibration.
+
 **QA403/QA402 only:** the allowed values are `0.0`, `+6.0`, `+12.0`, `+18.0`,
 `+24.0`, `+30.0`, `+36.0` and `+42.0`. Values below `+24.0` will disengage the
 hardware input attenuator.
@@ -65,6 +71,12 @@ The default value is `+42.0` for the QA403/QA402 and `+26.0` for the QA401.
 
 *Floating point*-typed option that determines which QA40x output voltage full
 scale sample values map to (i.e. the maximum output level), in dBV.
+
+**Note:** the purpose of this option is to adjust output gain and attenuator
+settings. The value entered here is NOT calibrated. The true full scale output
+voltage may deviate from this setting by several dB, and therefore should not be
+used for accurate absolute input voltage readings. If that's what you're after,
+you will want to do your own separate calibration.
 
 **QA403/QA402 only:** the allowed values are `-12.0`, `-2.0`, `+8.0` and
 `+18.0`.
