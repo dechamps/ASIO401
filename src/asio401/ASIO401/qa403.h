@@ -47,9 +47,9 @@ namespace asio401 {
 
 		void Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate);
 		void Start();
-		void StartWrite(const void* buffer, size_t size);
+		void StartWrite(const std::byte* buffer, size_t size);
 		void FinishWrite();
-		void StartRead(void* buffer, size_t size);
+		void StartRead(std::byte* buffer, size_t size);
 		void FinishRead();
 
 	private:

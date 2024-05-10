@@ -35,7 +35,7 @@ namespace asio401 {
 		Log() << "QA401 is reset";
 	}
 
-	void QA401::StartWrite(const void* buffer, size_t size) {
+	void QA401::StartWrite(const std::byte* buffer, size_t size) {
 		qa40x.StartWrite(buffer, size);
 	}
 
@@ -43,7 +43,7 @@ namespace asio401 {
 		qa40x.FinishWrite();
 	}
 
-	void QA401::StartRead(void* buffer, size_t size) {
+	void QA401::StartRead(std::byte* buffer, size_t size) {
 		qa40x.StartRead(buffer, size);
 	}
 	

@@ -15,13 +15,37 @@ namespace asio401 {
 		assert(result != 0);
 	}
 
-	WindowsOverlappedEvent::WindowsOverlappedEvent() : eventHandle([&] {
-		const auto eventHandle = CreateEventA(/*lpEventAttributes=*/NULL, /*bManualReset=*/TRUE, /*initialState=*/NULL, /*lpName=*/NULL);
+	WindowsReusableEvent::WindowsReusableEvent() : eventHandle([&] {
+		const auto eventHandle = ::CreateEventA(/*lpEventAttributes=*/NULL, /*bManualReset=*/TRUE, /*initialState=*/FALSE, /*lpName=*/NULL);
 		if (eventHandle == NULL) throw std::runtime_error("Unable to create event handle: " + GetWindowsErrorString(GetLastError()));
 		return eventHandle;
-	}()) {
+	}()) {}
+
+	WindowsReusableEvent::~WindowsReusableEvent() {
+		assert(owner == nullptr);
+	}
+
+	WindowsReusableEvent::Owned::Owned(WindowsReusableEvent& reusableEvent) : reusableEvent(reusableEvent) {
+#ifndef NDEBUG
+		assert(reusableEvent.owner == nullptr);
+		reusableEvent.owner = this;
+
+		assert(::WaitForSingleObject(getEventHandle(), 0) == WAIT_TIMEOUT);
+#endif
+	}
+
+	WindowsReusableEvent::Owned::~Owned() {
+#ifndef NDEBUG
+		assert(::WaitForSingleObject(getEventHandle(), 0) == WAIT_TIMEOUT);
+		assert(reusableEvent.owner == this);
+		reusableEvent.owner = nullptr;
+#endif
+	}
+
+	WindowsOverlappedEvent::WindowsOverlappedEvent(WindowsReusableEvent& reusableEvent) :
+		ownedReusableEvent(reusableEvent) {
 		overlapped = { 0 };
-		overlapped.hEvent = eventHandle.get();
+		overlapped.hEvent = ownedReusableEvent.getEventHandle();
 	}
 
 }

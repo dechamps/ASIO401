@@ -18,9 +18,9 @@ namespace asio401 {
 			StartWriteRegister(registerNumber, value);
 			FinishWriteRegister();
 		}
-		void StartWrite(const void* buffer, size_t size);
+		void StartWrite(const std::byte* buffer, size_t size);
 		void FinishWrite();
-		void StartRead(void* buffer, size_t size);
+		void StartRead(std::byte* buffer, size_t size);
 		void FinishRead();
 		void AbortIO();
 
@@ -33,15 +33,11 @@ namespace asio401 {
 
 		WinUsbHandle winUsb;
 
-		std::array<uint8_t, 5> registerWriteBuffer;
+		std::array<std::byte, 5> registerWriteBuffer;
 
-		WindowsOverlappedEvent readOverlapped;
-		WindowsOverlappedEvent writeOverlapped;
-		WindowsOverlappedEvent registerOverlapped;
-
-		std::optional<WinUsbOverlappedIO> readIO;
-		std::optional<WinUsbOverlappedIO> writeIO;
-		std::optional<WinUsbOverlappedIO> registerIO;
+		ReusableWinUsbOverlappedIO readIO;
+		ReusableWinUsbOverlappedIO writeIO;
+		ReusableWinUsbOverlappedIO registerIO;
 	};
 
 }

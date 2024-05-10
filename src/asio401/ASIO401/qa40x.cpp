@@ -60,56 +60,49 @@ namespace asio401 {
 			WinUsbAbort(winUsb.InterfaceHandle(), pipeId);
 		}
 		for (const auto overlappedIO : { &readIO, &writeIO, &registerIO }) {
-			if (!overlappedIO->has_value()) continue;
+			if (!overlappedIO->IsPending()) continue;
 			// It is not clear if we really need to get the overlapped result after an abort. WinUsb_AbortPipe() states
 			// "this is a synchronous operation", which would seem to suggest the overlapped operation is done and we
 			// could just forget about it. It's not clear if this is really the case though, and general Windows I/O
 			// rules would normally require us to wait for cancelled operations to complete before we can clean up the
 			// overlapped state. Given the ambiguity, let's err on the safe side and await the overlapped operation -
 			// there are no real downsides to doing that anyway.
-			(*overlappedIO)->Wait(/*tolerateAborted=*/true);
-			overlappedIO->reset();
+			overlappedIO->Wait(/*tolerateAborted=*/true);
 		}
 	}
 
-	void QA40x::StartWrite(const void* buffer, size_t size) {
+	void QA40x::StartWrite(const std::byte* buffer, size_t size) {
 		if (IsLoggingEnabled()) Log() << "Need to write " << size << " bytes to QA40x";
-		if (writeIO.has_value()) throw std::runtime_error("Attempted to start a QA40x write while one is already in flight");
-		writeIO = WinUsbWrite(winUsb.InterfaceHandle(), writePipeId, buffer, size, writeOverlapped.getOverlapped());
+		writeIO.Write(winUsb.InterfaceHandle(), writePipeId, buffer, size);
 	}
 
 	void QA40x::FinishWrite() {
-		if (!writeIO.has_value()) return;
+		if (!writeIO.IsPending()) return;
 		if (IsLoggingEnabled()) Log() << "Finishing QA40x write";
-		writeIO->Wait();
-		writeIO.reset();
+		writeIO.Wait();
 	}
 
-	void QA40x::StartRead(void* buffer, size_t size) {
+	void QA40x::StartRead(std::byte* buffer, size_t size) {
 		if (IsLoggingEnabled()) Log() << "Need to read " << size << " bytes from QA40x";
-		if (readIO.has_value()) throw std::runtime_error("Attempted to start a QA40x read while one is already in flight");
-		readIO = WinUsbRead(winUsb.InterfaceHandle(), readPipeId, buffer, size, readOverlapped.getOverlapped());
+		readIO.Read(winUsb.InterfaceHandle(), readPipeId, buffer, size);
 	}
 	
 	void QA40x::FinishRead() {
-		if (!readIO.has_value()) return;
+		if (!readIO.IsPending()) return;
 		if (IsLoggingEnabled()) Log() << "Finishing QA40x read";
-		readIO->Wait();
-		readIO.reset();
+		readIO.Wait();
 	}
 
 	void QA40x::StartWriteRegister(uint8_t registerNumber, uint32_t value) {
 		if (IsLoggingEnabled()) Log() << "Writing " << value << " to QA40x register #" << int(registerNumber);
-		if (registerIO.has_value()) throw std::runtime_error("Attempted to start a QA40x register write while one is already in flight");
-		registerWriteBuffer = { registerNumber, uint8_t(value >> 24), uint8_t(value >> 16), uint8_t(value >> 8), uint8_t(value >> 0) };
-		registerIO = WinUsbWrite(winUsb.InterfaceHandle(), registerPipeId, registerWriteBuffer.data(), registerWriteBuffer.size(), registerOverlapped.getOverlapped());
+		registerWriteBuffer = { std::byte(registerNumber), std::byte(value >> 24), std::byte(value >> 16), std::byte(value >> 8), std::byte(value >> 0) };
+		registerIO.Write(winUsb.InterfaceHandle(), registerPipeId, registerWriteBuffer.data(), registerWriteBuffer.size());
 	}
 
 	void QA40x::FinishWriteRegister() {
-		if (!registerIO.has_value()) return;
+		if (!registerIO.IsPending()) return;
 		if (IsLoggingEnabled()) Log() << "Finishing QA40x register write";
-		registerIO->Wait();
-		registerIO.reset();
+		registerIO.Wait();
 	}
 
 }
