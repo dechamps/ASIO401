@@ -26,9 +26,9 @@ namespace asio401 {
 		// Instead we do that register write in Reset(), and exploit the fact that the QA401 won't actually start streaming until the first write is sent. See https://github.com/dechamps/ASIO401/issues/10
 
 		void Reset(InputHighPassFilterState inputHighPassFilterState, AttenuatorState attenuatorState, SampleRate sampleRate);
-		void StartWrite(const std::byte* buffer, size_t size);
+		void StartWrite(std::span<const std::byte> buffer);
 		void FinishWrite();
-		void StartRead(std::byte* buffer, size_t size);
+		void StartRead(std::span<std::byte> buffer);
 		void FinishRead();
 		void Ping();
 

@@ -18,9 +18,9 @@ namespace asio401 {
 			StartWriteRegister(registerNumber, value);
 			FinishWriteRegister();
 		}
-		void StartWrite(const std::byte* buffer, size_t size);
+		void StartWrite(std::span<const std::byte> buffer);
 		void FinishWrite();
-		void StartRead(std::byte* buffer, size_t size);
+		void StartRead(std::span<std::byte> buffer);
 		void FinishRead();
 		void AbortIO();
 

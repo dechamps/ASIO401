@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <span>
 
 namespace asio401 {
 
@@ -39,8 +40,8 @@ namespace asio401 {
 		struct Read final {};
 		struct Write final {};
 
-		WinUsbOverlappedIO(Write, WINUSB_INTERFACE_HANDLE, UCHAR pipeId, const std::byte* data, size_t size, WindowsReusableEvent&);
-		WinUsbOverlappedIO(Read, WINUSB_INTERFACE_HANDLE, UCHAR pipeId, std::byte* data, size_t size, WindowsReusableEvent&);
+		WinUsbOverlappedIO(Write, WINUSB_INTERFACE_HANDLE, UCHAR pipeId, std::span<const std::byte> buffer, WindowsReusableEvent&);
+		WinUsbOverlappedIO(Read, WINUSB_INTERFACE_HANDLE, UCHAR pipeId, std::span<std::byte> buffer, WindowsReusableEvent&);
 
 		~WinUsbOverlappedIO() { assert(awaited); }
 
@@ -64,13 +65,13 @@ namespace asio401 {
 		ReusableWinUsbOverlappedIO(ReusableWinUsbOverlappedIO&) = delete;
 		ReusableWinUsbOverlappedIO& operator=(ReusableWinUsbOverlappedIO&) = delete;
 
-		void Write(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, const std::byte* data, size_t size) {
+		void Write(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::span<const std::byte> buffer) {
 			assert(!IsPending());
-			overlappedIO.emplace(WinUsbOverlappedIO::Write(), winusbInterfaceHandle, pipeId, data, size, windowsReusableEvent);
+			overlappedIO.emplace(WinUsbOverlappedIO::Write(), winusbInterfaceHandle, pipeId, buffer, windowsReusableEvent);
 		}
-		void Read(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::byte* data, size_t size) {
+		void Read(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::span<std::byte> buffer) {
 			assert(!IsPending());
-			overlappedIO.emplace(WinUsbOverlappedIO::Read(), winusbInterfaceHandle, pipeId, data, size, windowsReusableEvent);
+			overlappedIO.emplace(WinUsbOverlappedIO::Read(), winusbInterfaceHandle, pipeId, buffer, windowsReusableEvent);
 		}
 
 		bool IsPending() const { return overlappedIO.has_value(); }

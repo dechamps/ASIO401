@@ -597,13 +597,13 @@ namespace asio401 {
 						// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
 						//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
 						//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
-						qa401.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+						qa401.StartRead(std::span(readBuffer).first(firstReadBufferSizeInBytes));
 						// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
 						// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
 						// Starting streaming that way as a few interesting consequences:
 						//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
 						//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
-						qa401.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+						qa401.StartWrite(std::span(writeBuffer).first(firstWriteBufferSizeInBytes));
 						qa401.FinishWrite();
 						qa401.FinishRead();
 					},
@@ -611,12 +611,12 @@ namespace asio401 {
 						// The QA403 will only actually start streaming if we fill its output queue first - if we don't, reads will block forever.
 						// We could just start sending it actual output data, but there are scenarios in which that won't work, e.g. if only input channels are used, or if the ASIO buffer size is lower than the QA403 queue size.
 						// So instead, we just fill the output queue with silence to force the hardware to actually start streaming.
-						qa403.StartWrite(writeBuffer.data(), firstWriteBufferSizeInBytes);
+						qa403.StartWrite(std::span(writeBuffer).first(firstWriteBufferSizeInBytes));
 						// We don't want to queue real buffers at this point, because they would have to wait in line behind the silence we just wrote, resulting in extra output latency.
 						// Instead, we want to deliberalely drain the output queue. The most straightforward way to do that is to wait for the same amount of samples to be recorded (read).
 						// Note this will *de facto* trigger an output buffer underrun in the hardware. We work around this by sending silence as the next buffer (see below).
 						// TODO: this forces the user to wait for 512 frames (the size of the QA403 queue) before streaming starts. We could do better than this by putting actual output data at the end of that first priming write, and reading actual input data off the end of this first priming read. We're only talking ~10 ms though (assuming 48 kHz, the lowest supported sample rate) so it may not be worth the extra code complexity?
-						qa403.StartRead(readBuffer.data(), firstReadBufferSizeInBytes);
+						qa403.StartRead(std::span(readBuffer).first(firstReadBufferSizeInBytes));
 						qa403.FinishWrite();
 						qa403.FinishRead();
 					});
@@ -653,7 +653,7 @@ namespace asio401 {
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
 						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
 					}
-					preparedState.asio401.WithDevice([&](auto& device) { device.StartWrite(writeBuffer.data(), writeBufferSizeInBytes); });
+					preparedState.asio401.WithDevice([&](auto& device) { device.StartWrite(std::span(writeBuffer).first(writeBufferSizeInBytes)); });
 				}
 
 				if (hostSupportsOutputReady) driverBufferIndex = (driverBufferIndex + 1) % 2;
@@ -671,7 +671,7 @@ namespace asio401 {
 				}
 				if (mustRead) {
 					if (IsLoggingEnabled()) Log() << "Reading from QA40x";
-					preparedState.asio401.WithDevice([&](auto& device) { device.StartRead(readBuffer.data(), readBufferSizeInBytes); });
+					preparedState.asio401.WithDevice([&](auto& device) { device.StartRead(std::span(readBuffer).first(readBufferSizeInBytes)); });
 					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness());
 				}
 

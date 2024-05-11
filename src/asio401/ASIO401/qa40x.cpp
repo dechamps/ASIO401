@@ -71,9 +71,9 @@ namespace asio401 {
 		}
 	}
 
-	void QA40x::StartWrite(const std::byte* buffer, size_t size) {
-		if (IsLoggingEnabled()) Log() << "Need to write " << size << " bytes to QA40x";
-		writeIO.Write(winUsb.InterfaceHandle(), writePipeId, buffer, size);
+	void QA40x::StartWrite(std::span<const std::byte> buffer) {
+		if (IsLoggingEnabled()) Log() << "Need to write " << buffer.size() << " bytes to QA40x";
+		writeIO.Write(winUsb.InterfaceHandle(), writePipeId, buffer);
 	}
 
 	void QA40x::FinishWrite() {
@@ -82,9 +82,9 @@ namespace asio401 {
 		writeIO.Wait();
 	}
 
-	void QA40x::StartRead(std::byte* buffer, size_t size) {
-		if (IsLoggingEnabled()) Log() << "Need to read " << size << " bytes from QA40x";
-		readIO.Read(winUsb.InterfaceHandle(), readPipeId, buffer, size);
+	void QA40x::StartRead(std::span<std::byte> buffer) {
+		if (IsLoggingEnabled()) Log() << "Need to read " << buffer.size() << " bytes from QA40x";
+		readIO.Read(winUsb.InterfaceHandle(), readPipeId, buffer);
 	}
 	
 	void QA40x::FinishRead() {
@@ -96,7 +96,7 @@ namespace asio401 {
 	void QA40x::StartWriteRegister(uint8_t registerNumber, uint32_t value) {
 		if (IsLoggingEnabled()) Log() << "Writing " << value << " to QA40x register #" << int(registerNumber);
 		registerWriteBuffer = { std::byte(registerNumber), std::byte(value >> 24), std::byte(value >> 16), std::byte(value >> 8), std::byte(value >> 0) };
-		registerIO.Write(winUsb.InterfaceHandle(), registerPipeId, registerWriteBuffer.data(), registerWriteBuffer.size());
+		registerIO.Write(winUsb.InterfaceHandle(), registerPipeId, registerWriteBuffer);
 	}
 
 	void QA40x::FinishWriteRegister() {

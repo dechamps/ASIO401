@@ -35,16 +35,16 @@ namespace asio401 {
 		Log() << "QA401 is reset";
 	}
 
-	void QA401::StartWrite(const std::byte* buffer, size_t size) {
-		qa40x.StartWrite(buffer, size);
+	void QA401::StartWrite(std::span<const std::byte> buffer) {
+		qa40x.StartWrite(buffer);
 	}
 
 	void QA401::FinishWrite() {
 		qa40x.FinishWrite();
 	}
 
-	void QA401::StartRead(std::byte* buffer, size_t size) {
-		qa40x.StartRead(buffer, size);
+	void QA401::StartRead(std::span<std::byte> buffer) {
+		qa40x.StartRead(buffer);
 	}
 	
 	void QA401::FinishRead() {
