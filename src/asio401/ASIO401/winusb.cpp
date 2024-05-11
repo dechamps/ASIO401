@@ -2,6 +2,7 @@
 
 #include "log.h"
 
+#include "../ASIO401Util/variant.h"
 #include "../ASIO401Util/windows_error.h"
 #include "../ASIO401Util/windows_handle.h"
 
@@ -62,20 +63,21 @@ namespace asio401 {
 		return { std::move(windowsFile), WinUsbInterfaceHandleUniquePtr(winUsbInterfaceHandle) };
 	}
 
-	WinUsbOverlappedIO::WinUsbOverlappedIO(Write, WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::span<const std::byte> buffer, WindowsReusableEvent& windowsReusableEvent) :
-		winusbInterfaceHandle(winusbInterfaceHandle), size(buffer.size()), windowsOverlappedEvent(windowsReusableEvent) {
-		if (IsLoggingEnabled()) Log() << "Writing " << size << " bytes to WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << this;
-		if (WinUsb_WritePipe(winusbInterfaceHandle, pipeId, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(buffer.data())), ULONG(buffer.size()), /*LengthTransferred=*/NULL, &windowsOverlappedEvent.getOverlapped()) != FALSE || GetLastError() != ERROR_IO_PENDING) {
-			throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to WinUSB pipe " + GetUsbPipeIdString(pipeId) + ": " + GetWindowsErrorString(GetLastError()));
-		}
-	}
-
-	WinUsbOverlappedIO::WinUsbOverlappedIO(Read, WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::span<std::byte> buffer, WindowsReusableEvent& windowsReusableEvent) :
-		winusbInterfaceHandle(winusbInterfaceHandle), size(buffer.size()), windowsOverlappedEvent(windowsReusableEvent) {
-		if (IsLoggingEnabled()) Log() << "Reading " << size << " bytes from WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << this;
-		if (WinUsb_ReadPipe(winusbInterfaceHandle, pipeId, reinterpret_cast<PUCHAR>(buffer.data()), ULONG(buffer.size()), /*LengthTransferred=*/NULL, &windowsOverlappedEvent.getOverlapped()) != FALSE || GetLastError() != ERROR_IO_PENDING) {
-			throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from WinUSB pipe " + GetUsbPipeIdString(pipeId) + ": " + GetWindowsErrorString(GetLastError()));
-		}
+	WinUsbOverlappedIO::WinUsbOverlappedIO(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, Operation operation, WindowsReusableEvent& windowsReusableEvent) :
+		winusbInterfaceHandle(winusbInterfaceHandle), size(OnVariant(operation, [&](auto operation) { return operation.buffer.size(); })), windowsOverlappedEvent(windowsReusableEvent) {
+		OnVariant(operation,
+			[&](Write write) {
+				if (IsLoggingEnabled()) Log() << "Writing " << size << " bytes to WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << this;
+				if (WinUsb_WritePipe(winusbInterfaceHandle, pipeId, reinterpret_cast<PUCHAR>(const_cast<std::byte*>(write.buffer.data())), ULONG(write.buffer.size()), /*LengthTransferred=*/NULL, &windowsOverlappedEvent.getOverlapped()) != FALSE || GetLastError() != ERROR_IO_PENDING) {
+					throw std::runtime_error("Unable to write " + std::to_string(size) + " bytes to WinUSB pipe " + GetUsbPipeIdString(pipeId) + ": " + GetWindowsErrorString(GetLastError()));
+				}
+			},
+			[&](Read read) {
+				if (IsLoggingEnabled()) Log() << "Reading " << size << " bytes from WinUSB pipe " << GetUsbPipeIdString(pipeId) << " using overlapped I/O " << this;
+				if (WinUsb_ReadPipe(winusbInterfaceHandle, pipeId, reinterpret_cast<PUCHAR>(read.buffer.data()), ULONG(read.buffer.size()), /*LengthTransferred=*/NULL, &windowsOverlappedEvent.getOverlapped()) != FALSE || GetLastError() != ERROR_IO_PENDING) {
+					throw std::runtime_error("Unable to read " + std::to_string(size) + " bytes from WinUSB pipe " + GetUsbPipeIdString(pipeId) + ": " + GetWindowsErrorString(GetLastError()));
+				}
+			});
 	}
 
 	void WinUsbAbort(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId) {

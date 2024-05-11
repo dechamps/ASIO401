@@ -9,6 +9,7 @@
 #include <optional>
 #include <string_view>
 #include <span>
+#include <variant>
 
 namespace asio401 {
 
@@ -37,14 +38,18 @@ namespace asio401 {
 
 	class WinUsbOverlappedIO final {
 	public:
-		struct Read final {};
-		struct Write final {};
+		struct Write final {
+			explicit Write(std::span<const std::byte> buffer) : buffer(buffer) {}
+			std::span<const std::byte> buffer;
+		};
+		struct Read final {
+			explicit Read(std::span<std::byte> buffer) : buffer(buffer) {}
+			std::span<std::byte> buffer;
+		};
+		using Operation = std::variant<Read, Write>;
 
-		WinUsbOverlappedIO(Write, WINUSB_INTERFACE_HANDLE, UCHAR pipeId, std::span<const std::byte> buffer, WindowsReusableEvent&);
-		WinUsbOverlappedIO(Read, WINUSB_INTERFACE_HANDLE, UCHAR pipeId, std::span<std::byte> buffer, WindowsReusableEvent&);
-
+		WinUsbOverlappedIO(WINUSB_INTERFACE_HANDLE, UCHAR pipeId, Operation, WindowsReusableEvent&);
 		~WinUsbOverlappedIO() { assert(awaited); }
-
 		WinUsbOverlappedIO(const WinUsbOverlappedIO&) = delete;
 		WinUsbOverlappedIO& operator=(const WinUsbOverlappedIO&) = delete;
 
@@ -66,13 +71,9 @@ namespace asio401 {
 		ReusableWinUsbOverlappedIO(ReusableWinUsbOverlappedIO&) = delete;
 		ReusableWinUsbOverlappedIO& operator=(ReusableWinUsbOverlappedIO&) = delete;
 
-		void Write(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::span<const std::byte> buffer) {
+		void Start(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, WinUsbOverlappedIO::Operation operation) {
 			assert(!IsPending());
-			overlappedIO.emplace(WinUsbOverlappedIO::Write(), winusbInterfaceHandle, pipeId, buffer, windowsReusableEvent);
-		}
-		void Read(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, std::span<std::byte> buffer) {
-			assert(!IsPending());
-			overlappedIO.emplace(WinUsbOverlappedIO::Read(), winusbInterfaceHandle, pipeId, buffer, windowsReusableEvent);
+			overlappedIO.emplace(winusbInterfaceHandle, pipeId, operation, windowsReusableEvent);
 		}
 
 		_Check_return_ bool IsPending() const { return overlappedIO.has_value(); }
