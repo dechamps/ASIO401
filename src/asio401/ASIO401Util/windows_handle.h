@@ -22,9 +22,7 @@ namespace asio401 {
 		// Only one Owner can exist for a WindowsReusableEvent at any given time.
 		class Owned final {
 		public:
-			// Event is guaranteed to be initially nonsignalled.
 			Owned(WindowsReusableEvent&);
-			// Event must be nonsignalled on destruction.
 			~Owned();
 
 			Owned(const Owned&) = delete;

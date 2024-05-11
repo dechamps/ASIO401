@@ -95,9 +95,6 @@ namespace asio401 {
 		ULONG lengthTransferred = 0;
 		std::optional<DWORD> getOverlappedResultError;
 		if (::WinUsb_GetOverlappedResult(winusbInterfaceHandle, &windowsOverlappedEvent.getOverlapped(), &lengthTransferred, /*bWait=*/TRUE) == 0) getOverlappedResultError = GetLastError();
-
-		std::optional<DWORD> resetEventError;
-		if (::ResetEvent(windowsOverlappedEvent.getOwnedReusableEvent().getEventHandle()) == 0) resetEventError = GetLastError();
 		
 		if (getOverlappedResultError.has_value()) {
 			if (tolerateAborted && *getOverlappedResultError == ERROR_OPERATION_ABORTED) {
@@ -112,11 +109,6 @@ namespace asio401 {
 		if (lengthTransferred != size) {
 			Log() << "Invalid length for WinUSB overlapped I/O " << this << ": expected " << size << " bytes, got " << lengthTransferred << " bytes";
 			throw std::runtime_error("Unable to transfer " + std::to_string(lengthTransferred) + " bytes in WinUSB overlapped I/O");
-		}
-		if (resetEventError.has_value()) {
-			const auto error = GetWindowsErrorString(*resetEventError);
-			Log() << "Unable to reset event for WinUSB overlapped I/O " << this << ": " << error;
-			throw std::runtime_error("Unable to reset event in WinUSB overlapped I/O");
 		}
 
 		if (IsLoggingEnabled()) Log() << "WinUSB overlapped I/O " << this << " successful";

@@ -29,14 +29,11 @@ namespace asio401 {
 #ifndef NDEBUG
 		assert(reusableEvent.owner == nullptr);
 		reusableEvent.owner = this;
-
-		assert(::WaitForSingleObject(getEventHandle(), 0) == WAIT_TIMEOUT);
 #endif
 	}
 
 	WindowsReusableEvent::Owned::~Owned() {
 #ifndef NDEBUG
-		assert(::WaitForSingleObject(getEventHandle(), 0) == WAIT_TIMEOUT);
 		assert(reusableEvent.owner == this);
 		reusableEvent.owner = nullptr;
 #endif
