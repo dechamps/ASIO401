@@ -561,8 +561,8 @@ namespace asio401 {
 			// safety mechanisms - instead we just piggyback on the (assumed?) thread safety of the underlying I/O abort mechanism.
 			// This could end up racing against the same abort calls in TearDownDevice(), but this shouldn't be of any
 			// practical consequence.
-			device.AbortRead();
-			device.AbortWrite();
+			device.GetReadChannel().Abort();
+			device.GetWriteChannel().Abort();
 		});
 		thread.join();
 	}
@@ -585,12 +585,13 @@ namespace asio401 {
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.GetHardwareQueueSizeInFrames() * readFrameSizeInBytes;
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
 		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInFrames * readFrameSizeInBytes;
-		// Out of the try/catch scope because these can still be inflight even after an exception is thrown.
 		std::vector<std::byte> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
 		std::vector<std::byte> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
+		QA40xIOSlot<QA40x::ChannelType::WRITE> writeIOSlot;
+		QA40xIOSlot<QA40x::ChannelType::READ> readIOSlot;
 
-		// We abuse exception handling to process stop requests - this is a bit shameful but it does make the code more straightforward.
 		struct StopRequested final {};
+		// We abuse exception handling to process stop requests - this is a bit shameful but it does make the code more straightforward.
 		const auto checkStopRequested = [&] {
 			if (stopRequested) {
 				Log() << "Stop was requested, aborting";
@@ -599,34 +600,30 @@ namespace asio401 {
 		};
 
 		const auto startRead = [&](size_t size) {
-			preparedState.asio401.WithDevice([&](auto& device) {
-				device.StartRead(std::span(readBuffer).first(size));
-			});
+			readIOSlot.Start(
+				preparedState.asio401.WithDevice([&](auto& device) { return device.GetReadChannel(); }),
+				std::span(readBuffer).first(size));
 		};
 		const auto startWrite = [&](size_t size) {
-			preparedState.asio401.WithDevice([&](auto& device) {
-				device.StartWrite(std::span(writeBuffer).first(size));
-			});
+			writeIOSlot.Start(
+				preparedState.asio401.WithDevice([&](auto& device) { return device.GetWriteChannel(); }),
+				std::span(writeBuffer).first(size));
 		};
 		const auto finishRead = [&] {
-			preparedState.asio401.WithDevice([&](auto& device) {
-				// We may have been asked to stop before `StartRead()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
+			// We may have been asked to stop before `StartRead()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
+			checkStopRequested();
+			if (readIOSlot.Await() == QA40x::ReadChannel::Pending::AwaitResult::ABORTED) {
 				checkStopRequested();
-				if (device.FinishRead() == std::remove_reference_t<decltype(device)>::FinishResult::ABORTED) {
-					checkStopRequested();
-					throw new std::runtime_error("QA40x read was unexpectedly aborted");
-				}
-			});
+				throw new std::runtime_error("QA40x read was unexpectedly aborted");
+			}
 		};
 		const auto finishWrite = [&] {
-			preparedState.asio401.WithDevice([&](auto& device) {
-				// We may have been asked to stop before `StartWrite()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
+			// We may have been asked to stop before `StartWrite()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
+			checkStopRequested();
+			if (writeIOSlot.Await() == QA40x::ReadChannel::Pending::AwaitResult::ABORTED) {
 				checkStopRequested();
-				if (device.FinishWrite() == std::remove_reference_t<decltype(device)>::FinishResult::ABORTED) {
-					checkStopRequested();
-					throw new std::runtime_error("QA40x write was unexpectedly aborted");
-				}
-			});
+				throw new std::runtime_error("QA40x write was unexpectedly aborted");
+			}
 		};
 
 		Win32HighResolutionTimer win32HighResolutionTimer;
@@ -756,6 +753,20 @@ namespace asio401 {
 		}
 
 		try {
+			preparedState.asio401.WithDevice([&](auto& device) {
+				// ~RunningState() may already be calling `AbortRead()`/`AbortWrite()` at the same time,
+				// but that shouldn't matter - whomever gets there first will trigger the abort and the
+				// second call should be a no-op.
+				if (readIOSlot.HasPending()) {
+					device.GetReadChannel().Abort();
+					(void)readIOSlot.Await();
+				}
+				if (writeIOSlot.HasPending()) {
+					device.GetWriteChannel().Abort();
+					(void)writeIOSlot.Await();
+				}
+			});
+
 			TearDownDevice();
 		}
 		catch (const std::exception& exception) {
@@ -789,19 +800,6 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::TearDownDevice() {
-		preparedState.asio401.WithDevice([&](auto& device) {
-			// ~RunningState() may already be calling `AbortRead()`/`AbortWrite()` at the same time,
-			// but that shouldn't matter - whomever gets there first will trigger the abort and the
-			// second call should be a no-op.
-			if (device.ReadPending()) {
-				device.AbortRead();
-				(void)device.FinishRead();
-			}
-			if (device.WritePending()) {
-				device.AbortWrite();
-				(void)device.FinishWrite();
-			}
-		});
 		preparedState.asio401.WithDevice([&](QA401& qa401) {
 			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
 			qa401.Reset(

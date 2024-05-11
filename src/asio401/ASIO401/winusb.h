@@ -65,27 +65,6 @@ namespace asio401 {
 #endif
 	};
 
-	class ReusableWinUsbOverlappedIO final {
-	public:
-		ReusableWinUsbOverlappedIO() = default;
-		ReusableWinUsbOverlappedIO(ReusableWinUsbOverlappedIO&) = delete;
-		ReusableWinUsbOverlappedIO& operator=(ReusableWinUsbOverlappedIO&) = delete;
-
-		void Start(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId, WinUsbOverlappedIO::Operation operation) {
-			assert(!IsPending());
-			overlappedIO.emplace(winusbInterfaceHandle, pipeId, operation, windowsReusableEvent);
-		}
-
-		_Check_return_ bool IsPending() const { return overlappedIO.has_value(); }
-
-		using AwaitResult = WinUsbOverlappedIO::AwaitResult;
-		_Check_return_ AwaitResult Await();
-
-	private:
-		WindowsReusableEvent windowsReusableEvent;
-		std::optional<WinUsbOverlappedIO> overlappedIO;
-	};
-
 	void WinUsbAbort(WINUSB_INTERFACE_HANDLE winusbInterfaceHandle, UCHAR pipeId);
 
 }

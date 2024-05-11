@@ -27,22 +27,18 @@ namespace asio401 {
 		// Instead we do that register write in Reset(), and exploit the fact that the QA401 won't actually start streaming until the first write is sent. See https://github.com/dechamps/ASIO401/issues/10
 
 		void Reset(InputHighPassFilterState inputHighPassFilterState, AttenuatorState attenuatorState, SampleRate sampleRate);
-
-		using FinishResult = QA40x::FinishResult;
-		void StartWrite(std::span<const std::byte> buffer) { return qa40x.StartWrite(buffer); }
-		_Check_return_ bool WritePending() const { return qa40x.WritePending(); }
-		void AbortWrite() { return qa40x.AbortWrite(); }
-		_Check_return_ FinishResult FinishWrite() { return qa40x.FinishWrite(); }
-		void StartRead(std::span<std::byte> buffer) { return qa40x.StartRead(buffer); }
-		_Check_return_ bool ReadPending() const { return qa40x.ReadPending(); }
-		void AbortRead() { return qa40x.AbortRead(); }
-		_Check_return_ FinishResult FinishRead() { return qa40x.FinishRead(); }
 		void Ping();
+
+		QA40x::WriteChannel GetWriteChannel() { return QA40x::WriteChannel(qa40x); }
+		QA40x::ReadChannel GetReadChannel() { return QA40x::ReadChannel(qa40x); };
 
 	private:
 		void AbortPing();
 
+		void WriteRegister(uint8_t registerNumber, uint32_t value) { registerIOSlot.Execute(QA40x::RegisterChannel(qa40x), registerNumber, value); }
+
 		QA40x qa40x;
+		RegisterQA40xIOSlot registerIOSlot;
 		bool pinging = false;
 	};
 

@@ -17,39 +17,39 @@ namespace asio401 {
 		AbortPing();
 
 		// Black magic incantations provided by QuantAsylum.
-		qa40x.WriteRegister(4, 1);
-		qa40x.WriteRegister(4, 0);
-		qa40x.WriteRegister(4, 3);
-		qa40x.WriteRegister(4, 1);
-		qa40x.WriteRegister(4, 3);
-		qa40x.WriteRegister(4, 0);
+		WriteRegister(4, 1);
+		WriteRegister(4, 0);
+		WriteRegister(4, 3);
+		WriteRegister(4, 1);
+		WriteRegister(4, 3);
+		WriteRegister(4, 0);
 		// Note: according to QuantAsylum these parameters can be changed at any time, except the sample rate, which can only be changed on reset.
-		qa40x.WriteRegister(5,
+		WriteRegister(5,
 			(inputHighPassFilterState == InputHighPassFilterState::ENGAGED ? 0x01 : 0) |
 			(attenuatorState == AttenuatorState::DISENGAGED ? 0x02 : 0) |
 			(sampleRate == SampleRate::KHZ48 ? 0x04 : 0)
 		);
-		qa40x.WriteRegister(6, 4);
+		WriteRegister(6, 4);
 		::Sleep(10);
-		qa40x.WriteRegister(6, 6);
-		qa40x.WriteRegister(6, 0);
-		qa40x.WriteRegister(4, 5);
+		WriteRegister(6, 6);
+		WriteRegister(6, 0);
+		WriteRegister(4, 5);
 
 		Log() << "QA401 is reset";
 	}
 
 	void QA401::Ping() {
-		if (pinging && qa40x.FinishWriteRegister() == QA40x::FinishResult::ABORTED) throw std::runtime_error("QA401 ping register write was unexpectedly aborted");
+		if (pinging && registerIOSlot.Await() == QA40x::RegisterChannel::Pending::AwaitResult::ABORTED) throw std::runtime_error("QA401 ping register write was unexpectedly aborted");
 		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
-		qa40x.StartWriteRegister(7, 3);
+		registerIOSlot.Start(QA40x::RegisterChannel(qa40x), 7, 3);
 		pinging = true;
 	}
 
 	void QA401::AbortPing() {
 		if (!pinging) return;
 		Log() << "Aborting QA401 ping";
-		qa40x.AbortWriteRegister();
-		(void)qa40x.FinishWriteRegister();
+		QA40x::RegisterChannel(qa40x).Abort();
+		(void)registerIOSlot.Await();
 		pinging = false;
 	}
 

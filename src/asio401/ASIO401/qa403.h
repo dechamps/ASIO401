@@ -48,18 +48,14 @@ namespace asio401 {
 		void Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate);
 		void Start();
 
-		using FinishResult = QA40x::FinishResult;
-		void StartWrite(std::span<const std::byte> buffer) { return qa40x.StartWrite(buffer); }
-		_Check_return_ bool WritePending() const { return qa40x.WritePending(); }
-		void AbortWrite() { qa40x.AbortWrite(); }
-		_Check_return_ FinishResult FinishWrite() { return qa40x.FinishWrite(); }
-		void StartRead(std::span<std::byte> buffer) { return qa40x.StartRead(buffer); }
-		_Check_return_ bool ReadPending() const { return qa40x.ReadPending(); }
-		void AbortRead() { qa40x.AbortRead(); }
-		_Check_return_ FinishResult FinishRead() { return qa40x.FinishRead(); }
+		QA40x::WriteChannel GetWriteChannel() { return QA40x::WriteChannel(qa40x); }
+		QA40x::ReadChannel GetReadChannel() { return QA40x::ReadChannel(qa40x); };
 
 	private:
+		void WriteRegister(uint8_t registerNumber, uint32_t value) { registerIOSlot.Execute(QA40x::RegisterChannel(qa40x), registerNumber, value); }
+
 		QA40x qa40x;
+		RegisterQA40xIOSlot registerIOSlot;
 	};
 
 }

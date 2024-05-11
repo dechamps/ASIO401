@@ -12,11 +12,11 @@ namespace asio401 {
 
 		// Reset the hardware. This is especially important in case of a previous unclean stop,
 		// where the hardware could be left in an inconsistent state.
-		qa40x.WriteRegister(8, 0);
-		qa40x.WriteRegister(5, uint32_t(fullScaleInputLevel));
-		qa40x.WriteRegister(6, uint32_t(fullScaleOutputLevel));
+		WriteRegister(8, 0);
+		WriteRegister(5, uint32_t(fullScaleInputLevel));
+		WriteRegister(6, uint32_t(fullScaleOutputLevel));
 		// QuantAsylum did not publicly document sample rate setting, this is from private correspondence with them.
-		qa40x.WriteRegister(9, uint32_t(sampleRate));
+		WriteRegister(9, uint32_t(sampleRate));
 		// Wait for a bit before setting the register again, otherwise it looks like the hardware
 		// "skips past" the zero state (some kind of ABA problem?)
 		::Sleep(50);
@@ -25,7 +25,7 @@ namespace asio401 {
 	}
 
 	void QA403::Start() {
-		qa40x.WriteRegister(8, 5);
+		WriteRegister(8, 5);
 	}
 
 }

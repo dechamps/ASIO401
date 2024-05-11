@@ -117,11 +117,4 @@ namespace asio401 {
 		return AwaitResult::SUCCESSFUL;
 	}
 
-	_Check_return_ ReusableWinUsbOverlappedIO::AwaitResult ReusableWinUsbOverlappedIO::Await() {
-		assert(IsPending());;
-		const auto result = overlappedIO->Await();
-		overlappedIO.reset();
-		return result;
-	}
-
 }
