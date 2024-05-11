@@ -554,6 +554,16 @@ namespace asio401 {
 
 	ASIO401::PreparedState::RunningState::~RunningState() {
 		stopRequested = true;
+		preparedState.asio401.WithDevice([&](auto& device) {
+			// Stop inflight I/O. If RunThread() is currently running `FinishRead()`/`FinishWrite()`, it will immediately
+			// see ABORTED and exit faster than it would if it waited for the I/O to complete.
+			// If there is no inflight I/O, these are no-ops. We don't check first because that would require extra thread
+			// safety mechanisms - instead we just piggyback on the (assumed?) thread safety of the underlying I/O abort mechanism.
+			// This could end up racing against the same abort calls in TearDownDevice(), but this shouldn't be of any
+			// practical consequence.
+			device.AbortRead();
+			device.AbortWrite();
+		});
 		thread.join();
 	}
 
@@ -579,6 +589,46 @@ namespace asio401 {
 		std::vector<std::byte> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
 		std::vector<std::byte> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
 
+		// We abuse exception handling to process stop requests - this is a bit shameful but it does make the code more straightforward.
+		struct StopRequested final {};
+		const auto checkStopRequested = [&] {
+			if (stopRequested) {
+				Log() << "Stop was requested, aborting";
+				throw StopRequested();
+			}
+		};
+
+		const auto startRead = [&](size_t size) {
+			preparedState.asio401.WithDevice([&](auto& device) {
+				device.StartRead(std::span(readBuffer).first(size));
+			});
+		};
+		const auto startWrite = [&](size_t size) {
+			preparedState.asio401.WithDevice([&](auto& device) {
+				device.StartWrite(std::span(writeBuffer).first(size));
+			});
+		};
+		const auto finishRead = [&] {
+			preparedState.asio401.WithDevice([&](auto& device) {
+				// We may have been asked to stop before `StartRead()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
+				checkStopRequested();
+				if (device.FinishRead() == std::remove_reference_t<decltype(device)>::FinishResult::ABORTED) {
+					checkStopRequested();
+					throw new std::runtime_error("QA40x read was unexpectedly aborted");
+				}
+			});
+		};
+		const auto finishWrite = [&] {
+			preparedState.asio401.WithDevice([&](auto& device) {
+				// We may have been asked to stop before `StartWrite()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
+				checkStopRequested();
+				if (device.FinishWrite() == std::remove_reference_t<decltype(device)>::FinishResult::ABORTED) {
+					checkStopRequested();
+					throw new std::runtime_error("QA40x write was unexpectedly aborted");
+				}
+			});
+		};
+
 		Win32HighResolutionTimer win32HighResolutionTimer;
 		// Note: Reset() calls are done under high priority, because the internal timing of the reset procedure is somewhat important to avoid https://github.com/dechamps/ASIO401/issues/9
 		AvrtHighPriority avrtHighPriority;
@@ -591,34 +641,34 @@ namespace asio401 {
 				// However this is mostly just a coincidence - the reasons why priming is done in this particular way are actually very different between the two devices.
 				// This is why the code below is the same for both devices, but the explanatory comments are very different.
 				preparedState.asio401.WithDevice(
-					[&](QA401& qa401) {
+					[&](QA401&) {
 						// The first frames read from the QA401 shortly after Reset() will always be silence, so throw them away.
 						// (Note: this does not mean that the hardware input queue is initially filled with silence. The read duration is consistent with its size - the QA401 is actually recording silence in real time.)
 						// Note that sleep(20 ms) would pretty much achieve the same result, but we time this using a QA401 read instead for two reasons:
 						//  - Using the QA401 clock for this is probably more accurate and more reliable than the CPU clock.
 						//  - As a nice side effect this will also throw away the "ghost" frames from the previous stream (if any) at the same time (see https://github.com/dechamps/ASIO401/issues/5)
-						qa401.StartRead(std::span(readBuffer).first(firstReadBufferSizeInBytes));
+						startRead(firstReadBufferSizeInBytes);
 						// We want to wait on the read now; waiting on this read in the first FinishRead() call of the processing loop below would be a bad idea as it would kill the time budget for the first bufferSwitch() call.
 						// This means we have to start the hardware, otherwise the read will block forever. Which is why we do a minuscule 1-frame write. Indeed the QA401 will not start until we do at least one write (see https://github.com/dechamps/ASIO401/issues/10).
 						// Starting streaming that way as a few interesting consequences:
 						//  - On the write side this is guaranteed to result in a buffer underrun, since the output queue will drain instantaneously. We work around this by sending silence as the next buffer (see below).
 						//  - On the read side we are fine because the next read will occur very shortly afterwards, and we should be well within the time budget that the QA401 input queue gives us (otherwise we would have a much bigger problem, anyway).
-						qa401.StartWrite(std::span(writeBuffer).first(firstWriteBufferSizeInBytes));
-						qa401.FinishWrite();
-						qa401.FinishRead();
+						startWrite(firstWriteBufferSizeInBytes);
+						finishWrite();
+						finishRead();
 					},
-					[&](QA403& qa403) {
+					[&](QA403&) {
 						// The QA403 will only actually start streaming if we fill its output queue first - if we don't, reads will block forever.
 						// We could just start sending it actual output data, but there are scenarios in which that won't work, e.g. if only input channels are used, or if the ASIO buffer size is lower than the QA403 queue size.
 						// So instead, we just fill the output queue with silence to force the hardware to actually start streaming.
-						qa403.StartWrite(std::span(writeBuffer).first(firstWriteBufferSizeInBytes));
+						startWrite(firstWriteBufferSizeInBytes);
 						// We don't want to queue real buffers at this point, because they would have to wait in line behind the silence we just wrote, resulting in extra output latency.
 						// Instead, we want to deliberalely drain the output queue. The most straightforward way to do that is to wait for the same amount of samples to be recorded (read).
 						// Note this will *de facto* trigger an output buffer underrun in the hardware. We work around this by sending silence as the next buffer (see below).
 						// TODO: this forces the user to wait for 512 frames (the size of the QA403 queue) before streaming starts. We could do better than this by putting actual output data at the end of that first priming write, and reading actual input data off the end of this first priming read. We're only talking ~10 ms though (assuming 48 kHz, the lowest supported sample rate) so it may not be worth the extra code complexity?
-						qa403.StartRead(std::span(readBuffer).first(firstReadBufferSizeInBytes));
-						qa403.FinishWrite();
-						qa403.FinishRead();
+						startRead(firstReadBufferSizeInBytes);
+						finishWrite();
+						finishRead();
 					});
 			}
 
@@ -649,16 +699,16 @@ namespace asio401 {
 							[&](const QA403&) { return false; }
 						);
 						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness(), invertPolarity);
-						preparedState.asio401.WithDevice([&](auto& device) { device.FinishWrite(); });
+						finishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
 						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
 					}
-					preparedState.asio401.WithDevice([&](auto& device) { device.StartWrite(std::span(writeBuffer).first(writeBufferSizeInBytes)); });
+					startWrite(writeBufferSizeInBytes);
 				}
 
 				if (hostSupportsOutputReady) driverBufferIndex = (driverBufferIndex + 1) % 2;
 				
-				if (!firstIteration && mustRead) preparedState.asio401.WithDevice([&](auto& device) { device.FinishRead(); });
+				if (!firstIteration && mustRead) finishRead();
 				currentSamplePosition.timestamp = ::dechamps_ASIOUtil::Int64ToASIO<ASIOTimeStamp>(((long long int) win32HighResolutionTimer.GetTimeMilliseconds()) * 1000000);
 				if (!firstIteration) {
 					if (preparedState.buffers.inputChannelCount > 0) {
@@ -671,7 +721,7 @@ namespace asio401 {
 				}
 				if (mustRead) {
 					if (IsLoggingEnabled()) Log() << "Reading from QA40x";
-					preparedState.asio401.WithDevice([&](auto& device) { device.StartRead(std::span(readBuffer).first(readBufferSizeInBytes)); });
+					startRead(readBufferSizeInBytes);
 					if (!firstIteration && preparedState.buffers.inputChannelCount > 0) PostProcessASIOInputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness());
 				}
 
@@ -681,6 +731,7 @@ namespace asio401 {
 					if (IsLoggingEnabled()) Log() << "Updating position: " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) << " samples, timestamp " << ::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.timestamp);
 					samplePosition = currentSamplePosition;
 					BufferSwitch(driverBufferIndex, currentSamplePosition);
+					checkStopRequested();
 					currentSamplePosition.samples = ::dechamps_ASIOUtil::Int64ToASIO<ASIOSamples>(::dechamps_ASIOUtil::ASIOToInt64(currentSamplePosition.samples) + preparedState.buffers.bufferSizeInFrames);
 				}
 
@@ -691,6 +742,9 @@ namespace asio401 {
 					[&](auto&) {});
 				firstIteration = false;
 			}
+		}
+		catch (StopRequested) {
+			Log() << "Streaming successfully stopped; tearing down device";
 		}
 		catch (const std::exception& exception) {
 			Log() << "Fatal error occurred in streaming thread: " << exception.what();
@@ -735,6 +789,19 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::TearDownDevice() {
+		preparedState.asio401.WithDevice([&](auto& device) {
+			// ~RunningState() may already be calling `AbortRead()`/`AbortWrite()` at the same time,
+			// but that shouldn't matter - whomever gets there first will trigger the abort and the
+			// second call should be a no-op.
+			if (device.ReadPending()) {
+				device.AbortRead();
+				(void)device.FinishRead();
+			}
+			if (device.WritePending()) {
+				device.AbortWrite();
+				(void)device.FinishWrite();
+			}
+		});
 		preparedState.asio401.WithDevice([&](QA401& qa401) {
 			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
 			qa401.Reset(

@@ -47,10 +47,16 @@ namespace asio401 {
 
 		void Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate);
 		void Start();
-		void StartWrite(std::span<const std::byte> buffer);
-		void FinishWrite();
-		void StartRead(std::span<std::byte> buffer);
-		void FinishRead();
+
+		using FinishResult = QA40x::FinishResult;
+		void StartWrite(std::span<const std::byte> buffer) { return qa40x.StartWrite(buffer); }
+		_Check_return_ bool WritePending() const { return qa40x.WritePending(); }
+		void AbortWrite() { qa40x.AbortWrite(); }
+		_Check_return_ FinishResult FinishWrite() { return qa40x.FinishWrite(); }
+		void StartRead(std::span<std::byte> buffer) { return qa40x.StartRead(buffer); }
+		_Check_return_ bool ReadPending() const { return qa40x.ReadPending(); }
+		void AbortRead() { qa40x.AbortRead(); }
+		_Check_return_ FinishResult FinishRead() { return qa40x.FinishRead(); }
 
 	private:
 		QA40x qa40x;

@@ -18,6 +18,12 @@ namespace asio401 {
 		Validate(requiresApp);
 	}
 
+	QA40x::~QA40x() {
+		assert(!readIO.IsPending());
+		assert(!writeIO.IsPending());
+		assert(!registerIO.IsPending());
+	}
+
 	void QA40x::Validate(const bool requiresApp) {
 		Log() << "Querying QA40x USB interface descriptor";
 		USB_INTERFACE_DESCRIPTOR usbInterfaceDescriptor = { 0 };
@@ -50,47 +56,37 @@ namespace asio401 {
 		Log() << "QA40x descriptors appear valid";
 	}
 
-	void QA40x::AbortIO() {
-		Log() << "Aborting all QA40x I/O";
-
-		for (const auto& pipeId : { registerPipeId, writePipeId, readPipeId }) {
-			// According to some sources, it would be a good idea to also call WinUsb_ResetPipe() here, as otherwise WinUsb_AbortPipe() may hang, e.g.:
-			//   https://android.googlesource.com/platform/development/+/487b1deae9082ff68833adf9eb47d57557f8bf16/host/windows/usb/winusb/adb_winusb_endpoint_object.cpp#66
-			// However in practice, if we implement this suggestion, and the process is abruptly terminated, then the next instance will hang on the first read from the read pipe! No idea why...
-			WinUsbAbort(winUsb.InterfaceHandle(), pipeId);
-		}
-		for (const auto overlappedIO : { &readIO, &writeIO, &registerIO }) {
-			if (!overlappedIO->IsPending()) continue;
-			// It is not clear if we really need to get the overlapped result after an abort. WinUsb_AbortPipe() states
-			// "this is a synchronous operation", which would seem to suggest the overlapped operation is done and we
-			// could just forget about it. It's not clear if this is really the case though, and general Windows I/O
-			// rules would normally require us to wait for cancelled operations to complete before we can clean up the
-			// overlapped state. Given the ambiguity, let's err on the safe side and await the overlapped operation -
-			// there are no real downsides to doing that anyway.
-			overlappedIO->Wait(/*tolerateAborted=*/true);
-		}
-	}
-
 	void QA40x::StartWrite(std::span<const std::byte> buffer) {
 		if (IsLoggingEnabled()) Log() << "Need to write " << buffer.size() << " bytes to QA40x";
 		writeIO.Write(winUsb.InterfaceHandle(), writePipeId, buffer);
 	}
 
-	void QA40x::FinishWrite() {
-		if (!writeIO.IsPending()) return;
+	void QA40x::AbortWrite() {
+		Log() << "Aborting QA40x write";
+		WinUsbAbort(winUsb.InterfaceHandle(), writePipeId);
+	}
+
+	_Check_return_ QA40x::FinishResult QA40x::FinishWrite() {
 		if (IsLoggingEnabled()) Log() << "Finishing QA40x write";
-		writeIO.Wait();
+		return writeIO.Await();
 	}
 
 	void QA40x::StartRead(std::span<std::byte> buffer) {
 		if (IsLoggingEnabled()) Log() << "Need to read " << buffer.size() << " bytes from QA40x";
 		readIO.Read(winUsb.InterfaceHandle(), readPipeId, buffer);
 	}
+
+	void QA40x::AbortRead() {
+		Log() << "Aborting QA40x read";
+		// According to some sources, it would be a good idea to also call WinUsb_ResetPipe() here, as otherwise WinUsb_AbortPipe() may hang, e.g.:
+		//   https://android.googlesource.com/platform/development/+/487b1deae9082ff68833adf9eb47d57557f8bf16/host/windows/usb/winusb/adb_winusb_endpoint_object.cpp#66
+		// However in practice, if we implement this suggestion, and the process is abruptly terminated, then the next instance will hang on the first read from the read pipe! No idea why...
+		WinUsbAbort(winUsb.InterfaceHandle(), readPipeId);
+	}
 	
-	void QA40x::FinishRead() {
-		if (!readIO.IsPending()) return;
+	_Check_return_ QA40x::FinishResult QA40x::FinishRead() {
 		if (IsLoggingEnabled()) Log() << "Finishing QA40x read";
-		readIO.Wait();
+		return readIO.Await();
 	}
 
 	void QA40x::StartWriteRegister(uint8_t registerNumber, uint32_t value) {
@@ -99,10 +95,24 @@ namespace asio401 {
 		registerIO.Write(winUsb.InterfaceHandle(), registerPipeId, registerWriteBuffer);
 	}
 
-	void QA40x::FinishWriteRegister() {
-		if (!registerIO.IsPending()) return;
+	void QA40x::AbortWriteRegister() {
+		Log() << "Aborting QA40x register write";
+		WinUsbAbort(winUsb.InterfaceHandle(), registerPipeId);
+	}
+
+	_Check_return_ QA40x::FinishResult QA40x::FinishWriteRegister() {
 		if (IsLoggingEnabled()) Log() << "Finishing QA40x register write";
-		registerIO.Wait();
+		return registerIO.Await();
+	}
+
+	void QA40x::WriteRegister(uint8_t registerNumber, uint32_t value) {
+		StartWriteRegister(registerNumber, value);
+		switch (FinishWriteRegister()) {
+		case FinishResult::ABORTED:
+			throw new std::runtime_error("QA40x register write was unexpectedly aborted");
+		case FinishResult::SUCCESSFUL:
+			break;
+		}
 	}
 
 }

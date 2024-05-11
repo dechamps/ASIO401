@@ -85,7 +85,7 @@ namespace asio401 {
 		}
 	}
 
-	void WinUsbOverlappedIO::Wait(bool tolerateAborted) {
+	_Check_return_ WinUsbOverlappedIO::AwaitResult WinUsbOverlappedIO::Await() {
 		if (IsLoggingEnabled()) Log() << "Waiting for WinUSB overlapped I/O " << this << " to complete";
 
 #ifndef NDEBUG
@@ -97,9 +97,9 @@ namespace asio401 {
 		if (::WinUsb_GetOverlappedResult(winusbInterfaceHandle, &windowsOverlappedEvent.getOverlapped(), &lengthTransferred, /*bWait=*/TRUE) == 0) getOverlappedResultError = GetLastError();
 		
 		if (getOverlappedResultError.has_value()) {
-			if (tolerateAborted && *getOverlappedResultError == ERROR_OPERATION_ABORTED) {
-				if (IsLoggingEnabled()) Log() << "WinUSB overlapped I/O " << this << " aborted as expected";
-				return;
+			if (*getOverlappedResultError == ERROR_OPERATION_ABORTED) {
+				if (IsLoggingEnabled()) Log() << "WinUSB overlapped I/O " << this << " was aborted";
+				return AwaitResult::ABORTED;
 			}
 
 			const auto error = GetWindowsErrorString(*getOverlappedResultError);
@@ -112,6 +112,14 @@ namespace asio401 {
 		}
 
 		if (IsLoggingEnabled()) Log() << "WinUSB overlapped I/O " << this << " successful";
+		return AwaitResult::SUCCESSFUL;
+	}
+
+	_Check_return_ ReusableWinUsbOverlappedIO::AwaitResult ReusableWinUsbOverlappedIO::Await() {
+		assert(IsPending());;
+		const auto result = overlappedIO->Await();
+		overlappedIO.reset();
+		return result;
 	}
 
 }

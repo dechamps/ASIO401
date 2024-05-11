@@ -21,18 +21,27 @@ namespace asio401 {
 		static constexpr auto outputChannelCount = 2;
 		
 		QA401(std::string_view devicePath);
+		~QA401();
 
 		// Note that there is no Start() call. Technically we could implement one by writing 5 into register 4 but that has rather nasty side effects. See https://github.com/dechamps/ASIO401/issues/9
 		// Instead we do that register write in Reset(), and exploit the fact that the QA401 won't actually start streaming until the first write is sent. See https://github.com/dechamps/ASIO401/issues/10
 
 		void Reset(InputHighPassFilterState inputHighPassFilterState, AttenuatorState attenuatorState, SampleRate sampleRate);
-		void StartWrite(std::span<const std::byte> buffer);
-		void FinishWrite();
-		void StartRead(std::span<std::byte> buffer);
-		void FinishRead();
+
+		using FinishResult = QA40x::FinishResult;
+		void StartWrite(std::span<const std::byte> buffer) { return qa40x.StartWrite(buffer); }
+		_Check_return_ bool WritePending() const { return qa40x.WritePending(); }
+		void AbortWrite() { return qa40x.AbortWrite(); }
+		_Check_return_ FinishResult FinishWrite() { return qa40x.FinishWrite(); }
+		void StartRead(std::span<std::byte> buffer) { return qa40x.StartRead(buffer); }
+		_Check_return_ bool ReadPending() const { return qa40x.ReadPending(); }
+		void AbortRead() { return qa40x.AbortRead(); }
+		_Check_return_ FinishResult FinishRead() { return qa40x.FinishRead(); }
 		void Ping();
 
 	private:
+		void AbortPing();
+
 		QA40x qa40x;
 		bool pinging = false;
 	};

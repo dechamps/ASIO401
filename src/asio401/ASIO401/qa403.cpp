@@ -10,8 +10,6 @@ namespace asio401 {
 	void QA403::Reset(FullScaleInputLevel fullScaleInputLevel, FullScaleOutputLevel fullScaleOutputLevel, SampleRate sampleRate) {
 		Log() << "Resetting QA403";
 
-		qa40x.AbortIO();
-
 		// Reset the hardware. This is especially important in case of a previous unclean stop,
 		// where the hardware could be left in an inconsistent state.
 		qa40x.WriteRegister(8, 0);
@@ -28,22 +26,6 @@ namespace asio401 {
 
 	void QA403::Start() {
 		qa40x.WriteRegister(8, 5);
-	}
-
-	void QA403::StartWrite(std::span<const std::byte> buffer) {
-		qa40x.StartWrite(buffer);
-	}
-
-	void QA403::FinishWrite() {
-		qa40x.FinishWrite();
-	}
-
-	void QA403::StartRead(std::span<std::byte> buffer) {
-		qa40x.StartRead(buffer);
-	}
-	
-	void QA403::FinishRead() {
-		qa40x.FinishRead();
 	}
 
 }

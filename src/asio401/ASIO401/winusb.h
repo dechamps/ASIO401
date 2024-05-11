@@ -48,7 +48,8 @@ namespace asio401 {
 		WinUsbOverlappedIO(const WinUsbOverlappedIO&) = delete;
 		WinUsbOverlappedIO& operator=(const WinUsbOverlappedIO&) = delete;
 
-		void Wait(bool tolerateAborted = false);
+		enum class AwaitResult { SUCCESSFUL, ABORTED };
+		_Check_return_ AwaitResult Await();
 
 	private:
 		const WINUSB_INTERFACE_HANDLE winusbInterfaceHandle;
@@ -74,13 +75,10 @@ namespace asio401 {
 			overlappedIO.emplace(WinUsbOverlappedIO::Read(), winusbInterfaceHandle, pipeId, buffer, windowsReusableEvent);
 		}
 
-		bool IsPending() const { return overlappedIO.has_value(); }
+		_Check_return_ bool IsPending() const { return overlappedIO.has_value(); }
 
-		void Wait(bool tolerateAborted = false) {
-			assert(IsPending());;
-			overlappedIO->Wait(tolerateAborted);
-			overlappedIO.reset();
-		}
+		using AwaitResult = WinUsbOverlappedIO::AwaitResult;
+		_Check_return_ AwaitResult Await();
 
 	private:
 		WindowsReusableEvent windowsReusableEvent;

@@ -7,11 +7,14 @@ namespace asio401 {
 	QA401::QA401(std::string_view devicePath) :
 		qa40x(devicePath, /*registerPipeId*/0x02, /*writePipeId*/0x04, /*readPipeId*/0x88, /*requiresApp*/true) {}
 
+	QA401::~QA401() {
+		AbortPing();
+	}
+
 	void QA401::Reset(InputHighPassFilterState inputHighPassFilterState, AttenuatorState attenuatorState, SampleRate sampleRate) {
 		Log() << "Resetting QA401 with attenuator " << (attenuatorState == AttenuatorState::DISENGAGED ? "disengaged" : "engaged") << " and sample rate " << (sampleRate == SampleRate::KHZ48 ? "48 kHz" : "192 kHz");
 
-		qa40x.AbortIO();
-		pinging = false;
+		AbortPing();
 
 		// Black magic incantations provided by QuantAsylum.
 		qa40x.WriteRegister(4, 1);
@@ -35,27 +38,19 @@ namespace asio401 {
 		Log() << "QA401 is reset";
 	}
 
-	void QA401::StartWrite(std::span<const std::byte> buffer) {
-		qa40x.StartWrite(buffer);
-	}
-
-	void QA401::FinishWrite() {
-		qa40x.FinishWrite();
-	}
-
-	void QA401::StartRead(std::span<std::byte> buffer) {
-		qa40x.StartRead(buffer);
-	}
-	
-	void QA401::FinishRead() {
-		qa40x.FinishRead();
-	}
-
 	void QA401::Ping() {
-		if (pinging) qa40x.FinishWriteRegister();
+		if (pinging && qa40x.FinishWriteRegister() == QA40x::FinishResult::ABORTED) throw std::runtime_error("QA401 ping register write was unexpectedly aborted");
 		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
 		qa40x.StartWriteRegister(7, 3);
 		pinging = true;
+	}
+
+	void QA401::AbortPing() {
+		if (!pinging) return;
+		Log() << "Aborting QA401 ping";
+		qa40x.AbortWriteRegister();
+		(void)qa40x.FinishWriteRegister();
+		pinging = false;
 	}
 
 }
