@@ -4,6 +4,8 @@
 #include "qa401.h"
 #include "qa403.h"
 
+#include "../ASIO401Util/variant.h"
+
 #include <dechamps_ASIOUtil/asiosdk/asiosys.h>
 #include <dechamps_ASIOUtil/asiosdk/asio.h>
 
@@ -154,12 +156,10 @@ namespace asio401 {
 			std::optional<RunningState> ownedRunningState;
 		};
 
-		template<class... Functors>
-		struct overloaded final : Functors... { using Functors::operator()...; };
 		template <class... Functors>
-		auto WithDevice(Functors... functors) const { return std::visit(overloaded<Functors...>{functors...}, device); }
+		auto WithDevice(Functors&&... functors) const { return OnVariant(device, std::forward<Functors>(functors)...); }
 		template <class... Functors>
-		auto WithDevice(Functors... functors) { return std::visit(overloaded<Functors...>{functors...}, device); }
+		auto WithDevice(Functors&&... functors) { return OnVariant(device, std::forward<Functors>(functors)...); }
 
 		long GetDeviceInputChannelCount() const { return WithDevice([](const auto& device) { return device.inputChannelCount; }); }
 		long GetDeviceOutputChannelCount() const { return WithDevice([](const auto& device) { return device.outputChannelCount; }); }
