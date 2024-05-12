@@ -104,6 +104,10 @@ namespace asio401 {
 		}
 
 		void CopyToQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const std::span<std::byte> qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes) {
+			const auto calculateDestinationOffset = [&](size_t channelOffset, size_t sampleCount) {
+				return (channelCount * sampleCount + channelOffset) * sampleSizeInBytes;
+			};
+			assert(calculateDestinationOffset(0, bufferSizeInFrames) == qa40xBuffer.size());
 			for (const auto& bufferInfo : bufferInfos) {
 				if (bufferInfo.isInput) continue;
 
@@ -113,15 +117,16 @@ namespace asio401 {
 				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount) {
-					const auto destinationOffset = (channelCount * sampleCount + channelOffset) * sampleSizeInBytes;
-					const auto length = sampleSizeInBytes;
-					assert(destinationOffset + length <= qa40xBuffer.size());
-					memcpy(qa40xBuffer.data() + destinationOffset, buffer + sampleCount * sampleSizeInBytes, length);
+					memcpy(qa40xBuffer.data() + calculateDestinationOffset(channelOffset, sampleCount), buffer + sampleCount * sampleSizeInBytes, sampleSizeInBytes);
 				}
 			}
 		}
 
 		void CopyFromQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const std::span<const std::byte> qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes, const bool swapChannels) {
+			const auto calculateSourceOffset = [&](size_t channelOffset, size_t sampleCount) {
+				return (channelCount * sampleCount + channelOffset) * sampleSizeInBytes;
+			};
+			assert(calculateSourceOffset(0, bufferSizeInFrames) == qa40xBuffer.size());
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!bufferInfo.isInput) continue;
 
@@ -131,10 +136,7 @@ namespace asio401 {
 				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount) {
-					const auto sourceOffset = (channelCount * sampleCount + channelOffset) * sampleSizeInBytes;
-					const auto length = sampleSizeInBytes;
-					assert(sourceOffset + length <= qa40xBuffer.size());
-					memcpy(buffer + sampleCount * sampleSizeInBytes, qa40xBuffer.data() + sourceOffset, length);
+					memcpy(buffer + sampleCount * sampleSizeInBytes, qa40xBuffer.data() + calculateSourceOffset(channelOffset, sampleCount), sampleSizeInBytes);
 				}
 			}
 		}
