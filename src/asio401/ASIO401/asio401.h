@@ -122,12 +122,13 @@ namespace asio401 {
 				template <QA40x::ChannelType channelType>
 				class QA40xBuffer final {
 				public:
-					explicit QA40xBuffer(size_t size) : buffer(size) {}
+					explicit QA40xBuffer(size_t size);
 
 					std::span<std::byte> data();
 					std::span<const std::byte> data() const;
 
-					QA40xIOSlot<channelType>& getIoSlot() { return ioSlot; }
+					QA40xIOSlot<channelType>& GetIoSlot() { return ioSlot; }
+					const QA40xIOSlot<channelType>& GetIoSlot() const { return ioSlot; }
 
 				private:
 					std::vector<std::byte> buffer;
@@ -138,6 +139,7 @@ namespace asio401 {
 				void SetupDevice();
 				void TearDownDevice();
 				void BufferSwitch(long driverBufferIndex, SamplePosition currentSamplePosition);
+				void Abort();
 
 				PreparedState& preparedState;
 				const ASIOSampleRate sampleRate;

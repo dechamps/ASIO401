@@ -39,7 +39,7 @@ namespace asio401 {
 	}
 
 	void QA401::Ping() {
-		if (pinging && registerIOSlot.Await() == QA40x::RegisterChannel::Pending::AwaitResult::ABORTED) throw std::runtime_error("QA401 ping register write was unexpectedly aborted");
+		if (pinging && registerIOSlot.Await() == QA40x::AwaitResult::ABORTED) throw std::runtime_error("QA401 ping register write was unexpectedly aborted");
 		// Black magic incantation provided by QuantAsylum. It's not clear what this is for; it only seems to keep the "Link" LED on during streaming.
 		registerIOSlot.Start(QA40x::RegisterChannel(qa40x), 7, 3);
 		pinging = true;

@@ -117,7 +117,7 @@ namespace asio401 {
 		winUsbOverlappedIO(channel.winUsbInterfaceHandle, channel.pipeId, WinUsbOverlappedIO::Read(buffer), windowsReusableEvent) {}
 
 	template <QA40x::ChannelType channelType>
-	_Check_return_ QA40x::Channel<channelType>::Pending::AwaitResult QA40x::Channel<channelType>::Pending::Await() {
+	_Check_return_ QA40x::AwaitResult QA40x::Channel<channelType>::Pending::Await() {
 		if (IsLoggingEnabled()) Log() << "Awaiting result of QA40x pending " << channelName<channelType> << " operation " << this;
 		return winUsbOverlappedIO.Await();
 	}
@@ -127,7 +127,7 @@ namespace asio401 {
 	template QA40x::ReadChannel;
 
 	template <QA40x::ChannelType channelType>
-	QA40x::Channel<channelType>::Pending::AwaitResult QA40xIOSlot<channelType>::Await() {
+	QA40x::AwaitResult QA40xIOSlot<channelType>::Await() {
 		assert(pending.has_value());
 		auto result = pending->Await();
 		pending.reset();
@@ -136,7 +136,7 @@ namespace asio401 {
 
 	template <QA40x::ChannelType channelType>
 	void QA40xIOSlot<channelType>::AwaitRejectingAborted() {
-		if (Await() == QA40x::Channel<channelType>::Pending::AwaitResult::ABORTED)
+		if (Await() == QA40x::AwaitResult::ABORTED)
 			throw std::runtime_error("QA40x" + std::string(channelName<channelType>) + " operation was unexpectedly aborted");
 	}
 

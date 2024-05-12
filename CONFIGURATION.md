@@ -151,9 +151,9 @@ proportionally.
 QA40x for clock synchronization purposes even if no input channels are enabled.
 
 This option only has an effect if the ASIO Host Application exclusively uses
-ASIO401 in the output direction. The value of this option is ignored if any
-input channels are used, since in that case ASIO401 has to read data from the
-QA40x anyway.
+ASIO401 in the output direction (i.e. playback only, not recording). The value
+of this option is ignored if any input channels are used, since in that case
+ASIO401 has to read data from the QA40x anyway.
 
 If the option is set to `true` (or the ASIO Host application enables any
 input channels), then ASIO401 will use read operations to monitor the progress
@@ -161,13 +161,16 @@ of the QA40x clock, and will use that information to issue writes at the
 appropriate time. This decreases output latency.
 
 If the option is set to `false` (and the ASIO Host application does not enable
-any input channels), then ASIO401 will not issue any read operations, and will
-use write pushback to synchronize with the QA40x clock. This improves efficiency
-and relaxes performance constraints because USB load is reduced. On top of that,
-the likelihood of glitches (discontinuities) from missed deadlines is reduced
-because the QA40x output queue acts as an additional buffer. However, for the
-same reason, the output latency is increased by the length of the QA40x output
-queue, i.e. 1024 samples.
+any input channels), then ASIO401 will not issue any reads. Instead, it will use
+write pushback (backpressure) to synchronize with the QA40x clock. In practice
+this means that ASIO401 will let all the playback buffers throughout the entire
+chain fill up: the QA40x hardware queue, ASIO401's two internal buffers (each
+the same size as the ASIO buffer), and the ASIO buffer itself. Avoiding reads
+reduces USB load, which improves improves efficiency and relaxes performance
+constraints. On top of that, the likelihood of glitches (discontinuities) from
+missed deadlines is greatly reduced due to the additional buffering. The
+downside is the output latency is increased by one ASIO buffer size, plus the
+length of the QA40x output queue, i.e. 1024 samples.
 
 In general, it does not make sense to enable this option unless you care about
 latency.

@@ -12,6 +12,8 @@ namespace asio401 {
 	public:
 		QA40x(std::string_view devicePath, UCHAR registerPipeId, UCHAR writePipeId, UCHAR readPipeId, bool requiresApp);
 
+		using AwaitResult = WinUsbOverlappedIO::AwaitResult;
+
 		enum class ChannelType { REGISTER, WRITE, READ };
 		template <ChannelType channelType>
 		struct Channel {
@@ -28,7 +30,6 @@ namespace asio401 {
 				Pending(const Pending&) = delete;
 				Pending& operator=(const Pending&) = delete;
 
-				using AwaitResult = WinUsbOverlappedIO::AwaitResult;
 				_Check_return_ AwaitResult Await();
 
 			private:
@@ -84,7 +85,7 @@ namespace asio401 {
 		}
 		
 		_Check_return_ bool HasPending() const { return pending.has_value(); }
-		_Check_return_ QA40x::Channel<channelType>::Pending::AwaitResult Await();
+		_Check_return_ QA40x::AwaitResult Await();
 		
 	private:
 		template <typename... Args> void GenericStart(QA40x::Channel<channelType>, Args&&...);
