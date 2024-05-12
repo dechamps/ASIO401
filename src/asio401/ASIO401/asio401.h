@@ -61,7 +61,7 @@ namespace asio401 {
 			PreparedState(const PreparedState&) = delete;
 			PreparedState(PreparedState&&) = delete;
 
-			bool IsRunning() const { return runningState != nullptr; }
+			bool IsRunning() const { return runningState.has_value(); }
 			bool IsChannelActive(bool isInput, long channel) const;
 
 			void GetLatencies(long* inputLatency, long* outputLatency);
@@ -103,6 +103,13 @@ namespace asio401 {
 				RunningState(PreparedState& preparedState);
 				~RunningState();
 
+				// Note: the reason why this is not done in the constructor is to allow `PreparedState::Start()`
+				// to properly set `PreparedState::runningState` before callbacks start flying. This is because
+				// the ASIO host application may decide to call GetSamplePosition() or OutputReady() as soon
+				// as bufferSwitch() is called without waiting for Start() to return - we don't want these calls
+				// to race with `PreparedState::Start()` constructing `PreparedState::runningState`.
+				void Start() { thread = std::thread([&] { RunThread(); }); }
+
 				void GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) const;
 				void OutputReady();
 
@@ -110,17 +117,6 @@ namespace asio401 {
 				struct SamplePosition {
 					ASIOSamples samples = { 0 };
 					ASIOTimeStamp timestamp = { 0 };
-				};
-
-				class Registration {
-				public:
-					Registration(RunningState*& holder, RunningState& runningState) : holder(holder) {
-						holder = &runningState;
-					}
-					~Registration() { holder = nullptr; }
-
-				private:
-					RunningState*& holder;
 				};
 
 				void RunThread() noexcept;
@@ -139,7 +135,6 @@ namespace asio401 {
 				std::condition_variable outputReadyCondition;
 				bool outputReady = true;
 
-				Registration registration{ preparedState.runningState, *this };
 				std::thread thread;
 			};
 
@@ -148,12 +143,7 @@ namespace asio401 {
 			const ASIOCallbacks callbacks;
 			Buffers buffers;
 			const std::vector<ASIOBufferInfo> bufferInfos;
-
-			// RunningState will set runningState before ownedRunningState has finished constructing.
-			// This allows PreparedState to properly forward stream callbacks that might fire before RunningState construction is fully complete.
-			// During steady-state operation, runningState just points to *ownedRunningState.
-			RunningState* runningState = nullptr;
-			std::optional<RunningState> ownedRunningState;
+			std::optional<RunningState> runningState;
 		};
 
 		template <class... Functors>

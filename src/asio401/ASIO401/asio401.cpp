@@ -534,8 +534,9 @@ namespace asio401 {
 
 	void ASIO401::PreparedState::Start()
 	{
-		if (runningState != nullptr) throw ASIOException(ASE_InvalidMode, "start() called twice");
-		ownedRunningState.emplace(*this);
+		if (runningState.has_value()) throw ASIOException(ASE_InvalidMode, "start() called twice");
+		runningState.emplace(*this);
+		runningState->Start();
 	}
 
 	ASIO401::PreparedState::RunningState::RunningState(PreparedState& preparedState) :
@@ -549,8 +550,7 @@ namespace asio401 {
 			Message(preparedState.callbacks.asioMessage, kAsioSupportsTimeInfo, 0, NULL, NULL) == 1;
 		Log() << "The host " << (result ? "supports" : "does not support") << " time info";
 		return result;
-	}()), thread([&] { RunThread(); }) {
-	}
+	}()) {	}
 
 	ASIO401::PreparedState::RunningState::~RunningState() {
 		stopRequested = true;
@@ -837,8 +837,8 @@ namespace asio401 {
 
 	void ASIO401::PreparedState::Stop()
 	{
-		if (runningState == nullptr) throw ASIOException(ASE_InvalidMode, "stop() called before start()");
-		ownedRunningState.reset();
+		if (!runningState.has_value()) throw ASIOException(ASE_InvalidMode, "stop() called before start()");
+		runningState.reset();
 	}
 
 	void ASIO401::GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp) {
@@ -848,7 +848,7 @@ namespace asio401 {
 
 	void ASIO401::PreparedState::GetSamplePosition(ASIOSamples* sPos, ASIOTimeStamp* tStamp)
 	{
-		if (runningState == nullptr) throw ASIOException(ASE_InvalidMode, "getSamplePosition() called before start()");
+		if (!runningState.has_value()) throw ASIOException(ASE_InvalidMode, "getSamplePosition() called before start()");
 		return runningState->GetSamplePosition(sPos, tStamp);
 	}
 
@@ -869,7 +869,7 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::OutputReady() {
-		if (runningState != nullptr) runningState->OutputReady();
+		if (runningState.has_value()) runningState->OutputReady();
 	}
 
 	void ASIO401::PreparedState::RunningState::OutputReady() {
