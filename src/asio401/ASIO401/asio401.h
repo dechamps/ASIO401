@@ -119,6 +119,21 @@ namespace asio401 {
 					ASIOTimeStamp timestamp = { 0 };
 				};
 
+				template <QA40x::ChannelType channelType>
+				class QA40xBuffer final {
+				public:
+					explicit QA40xBuffer(size_t size) : buffer(size) {}
+
+					std::span<std::byte> data();
+					std::span<const std::byte> data() const;
+
+					QA40xIOSlot<channelType>& getIoSlot() { return ioSlot; }
+
+				private:
+					std::vector<std::byte> buffer;
+					QA40xIOSlot<channelType> ioSlot;
+				};
+
 				void RunThread() noexcept;
 				void SetupDevice();
 				void TearDownDevice();

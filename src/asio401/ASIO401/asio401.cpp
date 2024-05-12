@@ -575,6 +575,18 @@ namespace asio401 {
 		thread.join();
 	}
 
+	template <QA40x::ChannelType channelType>
+	std::span<std::byte> ASIO401::PreparedState::RunningState::QA40xBuffer<channelType>::data() {
+		assert(!ioSlot.HasPending());
+		return buffer;
+	}
+
+	template <QA40x::ChannelType channelType>
+	std::span<const std::byte> ASIO401::PreparedState::RunningState::QA40xBuffer<channelType>::data() const {
+		assert(!ioSlot.HasPending());
+		return buffer;
+	}
+
 	void ASIO401::PreparedState::RunningState::RunningState::RunThread() noexcept {
 		bool resetRequestIssued = false;
 		auto requestReset = [&]() noexcept {
@@ -593,10 +605,8 @@ namespace asio401 {
 		const auto firstReadBufferSizeInBytes = preparedState.asio401.GetHardwareQueueSizeInFrames() * readFrameSizeInBytes;
 		const auto writeBufferSizeInBytes = preparedState.buffers.outputChannelCount > 0 ? preparedState.buffers.bufferSizeInFrames * writeFrameSizeInBytes : 0;
 		const auto readBufferSizeInBytes = preparedState.buffers.bufferSizeInFrames * readFrameSizeInBytes;
-		std::vector<std::byte> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
-		std::vector<std::byte> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
-		QA40xIOSlot<QA40x::ChannelType::WRITE> writeIOSlot;
-		QA40xIOSlot<QA40x::ChannelType::READ> readIOSlot;
+		QA40xBuffer<QA40x::ChannelType::WRITE> writeBuffer((std::max)(firstWriteBufferSizeInBytes, writeBufferSizeInBytes));
+		QA40xBuffer<QA40x::ChannelType::READ> readBuffer((std::max)(firstReadBufferSizeInBytes, readBufferSizeInBytes));
 
 		struct StopRequested final {};
 		// We abuse exception handling to process stop requests - this is a bit shameful but it does make the code more straightforward.
@@ -608,19 +618,19 @@ namespace asio401 {
 		};
 
 		const auto startRead = [&](size_t size) {
-			readIOSlot.Start(
+			readBuffer.getIoSlot().Start(
 				preparedState.asio401.WithDevice([&](auto& device) { return device.GetReadChannel(); }),
-				std::span(readBuffer).first(size));
+				std::span(readBuffer.data()).first(size));
 		};
 		const auto startWrite = [&](size_t size) {
-			writeIOSlot.Start(
+			writeBuffer.getIoSlot().Start(
 				preparedState.asio401.WithDevice([&](auto& device) { return device.GetWriteChannel(); }),
-				std::span(writeBuffer).first(size));
+				std::span(writeBuffer.data()).first(size));
 		};
 		const auto finishRead = [&] {
 			// We may have been asked to stop before `StartRead()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
 			checkStopRequested();
-			if (readIOSlot.Await() == QA40x::ReadChannel::Pending::AwaitResult::ABORTED) {
+			if (readBuffer.getIoSlot().Await() == QA40x::ReadChannel::Pending::AwaitResult::ABORTED) {
 				checkStopRequested();
 				throw new std::runtime_error("QA40x read was unexpectedly aborted");
 			}
@@ -628,7 +638,7 @@ namespace asio401 {
 		const auto finishWrite = [&] {
 			// We may have been asked to stop before `StartWrite()` was called. In that case `FinishRead()` will unnecessarily block instead of immediately returning ABORTED.
 			checkStopRequested();
-			if (writeIOSlot.Await() == QA40x::ReadChannel::Pending::AwaitResult::ABORTED) {
+			if (writeBuffer.getIoSlot().Await() == QA40x::ReadChannel::Pending::AwaitResult::ABORTED) {
 				checkStopRequested();
 				throw new std::runtime_error("QA40x write was unexpectedly aborted");
 			}
@@ -706,7 +716,7 @@ namespace asio401 {
 						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness(), invertPolarity);
 						finishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
-						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer, preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
+						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
 					}
 					startWrite(writeBufferSizeInBytes);
 				}
@@ -721,7 +731,7 @@ namespace asio401 {
 						const bool swapChannels = preparedState.asio401.WithDevice(
 							[&](const QA401&) { return true; }, // https://github.com/dechamps/ASIO401/issues/13
 							[&](const QA403&) { return false; });
-						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer, preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes(), swapChannels);
+						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes(), swapChannels);
 					}
 				}
 				if (mustRead) {
@@ -765,13 +775,13 @@ namespace asio401 {
 				// ~RunningState() may already be calling `AbortRead()`/`AbortWrite()` at the same time,
 				// but that shouldn't matter - whomever gets there first will trigger the abort and the
 				// second call should be a no-op.
-				if (readIOSlot.HasPending()) {
+				if (readBuffer.getIoSlot().HasPending()) {
 					device.GetReadChannel().Abort();
-					(void)readIOSlot.Await();
+					(void)readBuffer.getIoSlot().Await();
 				}
-				if (writeIOSlot.HasPending()) {
+				if (writeBuffer.getIoSlot().HasPending()) {
 					device.GetWriteChannel().Abort();
-					(void)writeIOSlot.Await();
+					(void)writeBuffer.getIoSlot().Await();
 				}
 			});
 
