@@ -103,7 +103,7 @@ namespace asio401 {
 			return result;
 		}
 
-		void CopyToQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, void* const qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes) {
+		void CopyToQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const std::span<std::byte> qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (bufferInfo.isInput) continue;
 
@@ -112,12 +112,16 @@ namespace asio401 {
 				const auto channelOffset = (channelNum + 1) % channelCount;  // https://github.com/dechamps/ASIO401/issues/13
 				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
-				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(static_cast<std::byte*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, buffer + sampleCount * sampleSizeInBytes, sampleSizeInBytes);
+				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount) {
+					const auto destinationOffset = (channelCount * sampleCount + channelOffset) * sampleSizeInBytes;
+					const auto length = sampleSizeInBytes;
+					assert(destinationOffset + length <= qa40xBuffer.size());
+					memcpy(qa40xBuffer.data() + destinationOffset, buffer + sampleCount * sampleSizeInBytes, length);
+				}
 			}
 		}
 
-		void CopyFromQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const void* const qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes, const bool swapChannels) {
+		void CopyFromQA40xBuffer(const std::vector<ASIOBufferInfo>& bufferInfos, const size_t bufferSizeInFrames, const long doubleBufferIndex, const std::span<const std::byte> qa40xBuffer, const long channelCount, const size_t sampleSizeInBytes, const bool swapChannels) {
 			for (const auto& bufferInfo : bufferInfos) {
 				if (!bufferInfo.isInput) continue;
 
@@ -126,8 +130,12 @@ namespace asio401 {
 				const auto channelOffset = swapChannels ? (channelNum + 1) % channelCount : channelNum;
 				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
-				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount)
-					memcpy(buffer + sampleCount * sampleSizeInBytes, static_cast<const std::byte*>(qa40xBuffer) + (channelCount * sampleCount + channelOffset) * sampleSizeInBytes, sampleSizeInBytes);
+				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount) {
+					const auto sourceOffset = (channelCount * sampleCount + channelOffset) * sampleSizeInBytes;
+					const auto length = sampleSizeInBytes;
+					assert(sourceOffset + length <= qa40xBuffer.size());
+					memcpy(buffer + sampleCount * sampleSizeInBytes, qa40xBuffer.data() + sourceOffset, length);
+				}
 			}
 		}
 
@@ -698,7 +706,7 @@ namespace asio401 {
 						PreProcessASIOOutputBuffers(preparedState.bufferInfos, driverBufferIndex, preparedState.buffers.bufferSizeInFrames, preparedState.asio401.GetDeviceSampleSizeInBytes(), preparedState.asio401.GetDeviceSampleEndianness(), invertPolarity);
 						finishWrite();
 						if (IsLoggingEnabled()) Log() << "Sending data from buffer index " << driverBufferIndex << " to QA40x";
-						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer.data(), preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
+						CopyToQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, writeBuffer, preparedState.asio401.GetDeviceOutputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes());
 					}
 					startWrite(writeBufferSizeInBytes);
 				}
@@ -713,7 +721,7 @@ namespace asio401 {
 						const bool swapChannels = preparedState.asio401.WithDevice(
 							[&](const QA401&) { return true; }, // https://github.com/dechamps/ASIO401/issues/13
 							[&](const QA403&) { return false; });
-						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer.data(), preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes(), swapChannels);
+						CopyFromQA40xBuffer(preparedState.bufferInfos, preparedState.buffers.bufferSizeInFrames, driverBufferIndex, readBuffer, preparedState.asio401.GetDeviceInputChannelCount(), preparedState.asio401.GetDeviceSampleSizeInBytes(), swapChannels);
 					}
 				}
 				if (mustRead) {
