@@ -119,11 +119,11 @@ that the QA40x hardware queue is always being drained, and hopefully stays
 nearly empty at all times.
 
 At 48 kHz, the best tradeoff between reliability and latency is likely to be
-1024 samples; this ensures there is always some data queued on the USB host side
-to keep the QA40x hardware output queue nearly filled at all times. Smaller
-buffers only make sense if you care about latency. Larger buffers will always
-improve reliability and efficiency by relaxing scheduling constraints and
-allowing for more data to be preloaded, but come with diminishing returns.
+1024 samples; this ensures the QA40x hardware queue is always full (under the
+assumption that buffer switches are instant). Smaller buffers only make sense if
+you care about latency. Larger buffers will always improve reliability and
+efficiency by relaxing scheduling constraints and allowing for more data to be
+preloaded, but come with diminishing returns.
 
 At higher sample rates, it is recommended to use a larger buffer size due to the
 tigher buffer processing deadlines that could otherwise result in
