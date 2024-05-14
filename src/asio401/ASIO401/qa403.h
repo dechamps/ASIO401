@@ -41,7 +41,6 @@ namespace asio401 {
 		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
 		static constexpr auto inputChannelCount = 2;
 		static constexpr auto outputChannelCount = 2;
-		static constexpr auto sampleRate = 48000;  // TODO: support other sample rates
 		
 		QA403(std::string_view devicePath);
 
