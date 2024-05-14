@@ -113,7 +113,7 @@ namespace asio401 {
 
 				const auto channelNum = bufferInfo.channelNum;
 				assert(channelNum < channelCount);
-				const auto channelOffset = (channelNum + 1) % channelCount;  // https://github.com/dechamps/ASIO401/issues/13
+				const auto channelOffset = (channelNum + 1) % channelCount;  // Both the QA401 and QA403 have their output channels swapped.
 				const auto buffer = static_cast<std::byte*>(bufferInfo.buffers[doubleBufferIndex]);
 
 				for (size_t sampleCount = 0; sampleCount < bufferSizeInFrames; ++sampleCount) {
