@@ -19,6 +19,7 @@ namespace asio401 {
 		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
 		static constexpr auto inputChannelCount = 2;
 		static constexpr auto outputChannelCount = 2;
+		static constexpr auto writeGranularityInFrames = 32;  // Measured empirically
 		
 		QA401(std::string_view devicePath);
 		~QA401();

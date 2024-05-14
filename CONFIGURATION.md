@@ -134,6 +134,12 @@ size setting; in this case, there should be no need to use this option. It is
 useful only when the application does not provide a way to customize the buffer
 size.
 
+Note that playback requires buffer sizes to be multiples of 64 (for the QA403)
+or 32 (for the QA401), otherwise the output is garbled. To prevent mistakes,
+ASIO401 will refuse to proceed if the host application attempts to use output
+channels while specifying a buffer size that violates this rule. Input-only
+streams are not affected.
+
 Example:
 
 ```toml

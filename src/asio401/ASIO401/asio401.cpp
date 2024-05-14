@@ -328,8 +328,9 @@ namespace asio401 {
 			// Technically there doesn't seem to be any limit on the size of a WinUSB transfer, but let's be reasonable
 			bufferSizes.maximum = 32768;
 
-			// Mostly arbitrary; based on the size of a single USB bulk transfer packet
-			bufferSizes.granularity = 64;
+			// QA40x devices have a minimum write granularity, under which the DAC output is garbled.
+			// We don't know if the user actually intends to use output channels at this point, but let's err on the safe side.
+			bufferSizes.granularity = long(GetDeviceWriteGranularityInFrames());
 		}
 		return bufferSizes;
 	}
@@ -459,6 +460,7 @@ namespace asio401 {
 		bufferInfos.reserve(numChannels);
 		size_t nextBuffersInputChannelIndex = 0;
 		size_t nextBuffersOutputChannelIndex = 0;
+		bool hasOutput = false;
 		for (long channelIndex = 0; channelIndex < numChannels; ++channelIndex)
 		{
 			ASIOBufferInfo& asioBufferInfo = asioBufferInfos[channelIndex];
@@ -471,6 +473,7 @@ namespace asio401 {
 			{
 				if (asioBufferInfo.channelNum < 0 || asioBufferInfo.channelNum >= asio401.GetDeviceOutputChannelCount())
 					throw ASIOException(ASE_InvalidParameter, "out of bounds output channel in createBuffers() buffer info");
+				hasOutput = true;
 			}
 			const auto getBuffer = asioBufferInfo.isInput ? &Buffers::GetInputBuffer : &Buffers::GetOutputBuffer;
 			auto& nextBuffersChannelIndex = asioBufferInfo.isInput ? nextBuffersInputChannelIndex : nextBuffersOutputChannelIndex;
@@ -486,6 +489,13 @@ namespace asio401 {
 				<< " - second half: " << static_cast<const void*>(second_half) << "-" << static_cast<const void*>(second_half + bufferSizeInBytes);
 			bufferInfos.push_back(asioBufferInfo);
 		}
+
+		if (hasOutput) {
+			const auto requiredGranularityInFrames = asio401.GetDeviceWriteGranularityInFrames();
+			if (bufferSizeInFrames % requiredGranularityInFrames != 0)
+				throw ASIOException(ASE_InvalidMode, "Buffer size must be a multiple of " + std::to_string(requiredGranularityInFrames) + " when output channels are used");
+		}
+
 		return bufferInfos;
 	}()) {
 		if (callbacks->asioMessage) ProbeHostMessages(callbacks->asioMessage);
@@ -706,11 +716,11 @@ namespace asio401 {
 			buffer.GetIoSlot().Start(channel, std::span(buffer.data()).first(nextSizeInBytes));
 			bufferIndex = (bufferIndex + 1) % buffers.size();
 		};
-		const auto startQa40xWrite = [&](size_t size) {
-			return startQa40xOperation(writeBuffers, writeBufferIndex, size, preparedState.asio401.WithDevice([&](auto& device) { return device.GetWriteChannel(); }), "write");
+		const auto startQa40xWrite = [&](size_t sizeInBytes) {
+			return startQa40xOperation(writeBuffers, writeBufferIndex, sizeInBytes, preparedState.asio401.WithDevice([&](auto& device) { return device.GetWriteChannel(); }), "write");
 		};
-		const auto startQa40xRead = [&](size_t size) {
-			return startQa40xOperation(readBuffers, readBufferIndex, size, preparedState.asio401.WithDevice([&](auto& device) { return device.GetReadChannel(); }), "read");
+		const auto startQa40xRead = [&](size_t sizeInBytes) {
+			return startQa40xOperation(readBuffers, readBufferIndex, sizeInBytes, preparedState.asio401.WithDevice([&](auto& device) { return device.GetReadChannel(); }), "read");
 		};
 
 		Win32HighResolutionTimer win32HighResolutionTimer;
@@ -731,7 +741,9 @@ namespace asio401 {
 			};
 			const auto startSending = [&] {
 				if (IsLoggingEnabled()) Log() << "Starting a write from QA40x buffer index " << writeBufferIndex;
-				startQa40xWrite(firstWriteStarted ? asioBufferSizeInBytes : firstWriteSizeInFrames * writeFrameSizeInBytes);
+				const auto sizeInFrames = firstWriteStarted ? asioBufferSizeInBytes : firstWriteSizeInFrames * writeFrameSizeInBytes;
+				assert(sizeInFrames % preparedState.asio401.GetDeviceWriteGranularityInFrames() == 0);
+				startQa40xWrite(sizeInFrames);
 				firstWriteStarted = true;
 			};
 			const auto finishSending = [&] {

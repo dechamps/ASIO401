@@ -173,6 +173,7 @@ namespace asio401 {
 		::dechamps_cpputil::Endianness GetDeviceSampleEndianness() const { return WithDevice([](const auto& device) { return device.sampleEndianness; }); }
 		size_t GetDeviceSampleSizeInBytes() const { return WithDevice([](const auto& device) { return device.sampleSizeInBytes; }); }
 		size_t GetHardwareQueueSizeInFrames() const { return WithDevice([](const auto& device) { return device.hardwareQueueSizeInFrames; }); }
+		size_t GetDeviceWriteGranularityInFrames() const { return WithDevice([](const auto& device) { return device.writeGranularityInFrames; }); }
 
 		void ValidateConfig() const;
 
