@@ -635,7 +635,10 @@ namespace asio401 {
 				// After that, the QA401 produces about 1000 frames of silence, regardless of sample rate.
 				// (Note the read still takes about the same amount of time to complete, so time sync appears to bemaintained
 				// throughout - it's as if we're actually recording, but the data gets mangled before it's delivered to us.)
-				return 1056;
+				// Note: using 1056 (1024 + 32) should work in theory, but in practice it seems like the QA401 DAC doesn't like
+				// playing a buffer that is not 64-frame aligned followed by a buffer that is 64-frame aligned (even though the
+				// QA401 minimum write granularity is supposed to be 32 frames) so let's align that one to 64 frames to be safe.
+				return 1088;
 			},
 			[&](QA403&) { return 0; }
 		);
