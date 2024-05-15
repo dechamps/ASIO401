@@ -36,12 +36,12 @@ namespace asio401 {
 			KHZ384 = 3,
 		};
 
-		static constexpr auto sampleSizeInBytes = 4;  // 32-bit big endian signed integer
+		static constexpr auto sampleSizeInBytes = 4u;  // 32-bit big endian signed integer
 		static constexpr auto sampleEndianness = ::dechamps_cpputil::Endianness::LITTLE;
-		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
-		static constexpr auto inputChannelCount = 2;
-		static constexpr auto outputChannelCount = 2;
-		static constexpr auto writeGranularityInFrames = 64;  // Measured empirically
+		static constexpr auto hardwareQueueSizeInFrames = 1024u;  // Measured empirically
+		static constexpr auto inputChannelCount = 2u;
+		static constexpr auto outputChannelCount = 2u;
+		static constexpr auto writeGranularityInFrames = 64u;  // Measured empirically
 		
 		QA403(std::string_view devicePath);
 

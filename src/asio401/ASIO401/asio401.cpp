@@ -638,12 +638,12 @@ namespace asio401 {
 				// Note: using 1056 (1024 + 32) should work in theory, but in practice it seems like the QA401 DAC doesn't like
 				// playing a buffer that is not 64-frame aligned followed by a buffer that is 64-frame aligned (even though the
 				// QA401 minimum write granularity is supposed to be 32 frames) so let's align that one to 64 frames to be safe.
-				return 1088;
+				return 1088u;
 			},
-			[&](QA403&) { return 0; }
+			[&](QA403&) { return 0u; }
 		);
 		const auto outputQueueStartThresholdInFrames = preparedState.asio401.WithDevice(
-			[&](QA401&) { return 1; }, // The QA401 will start as soon as at least 1 frame is written to it.
+			[&](QA401&) { return 1u; }, // The QA401 will start as soon as at least 1 frame is written to it.
 			[&](QA403&) { return QA403::hardwareQueueSizeInFrames; } // The QA403 will only start once its internal queue has been filled.
 		);
 		const auto initialGarbageToSkipFrames = mustRecord ? initialInputGarbageInFrames : 0;

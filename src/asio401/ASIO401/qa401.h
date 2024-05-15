@@ -14,12 +14,12 @@ namespace asio401 {
 		enum class AttenuatorState { ENGAGED, DISENGAGED };
 		enum class SampleRate { KHZ48, KHZ192 };  // According to QuantAsylum, the QA401 only supports these two
 
-		static constexpr auto sampleSizeInBytes = 4;  // 32-bit big endian signed integer. According to QuantAsylum the actual precision is 24 bits.
+		static constexpr auto sampleSizeInBytes = 4u;  // 32-bit big endian signed integer. According to QuantAsylum the actual precision is 24 bits.
 		static constexpr auto sampleEndianness = ::dechamps_cpputil::Endianness::BIG;
-		static constexpr auto hardwareQueueSizeInFrames = 1024;  // Measured empirically
-		static constexpr auto inputChannelCount = 2;
-		static constexpr auto outputChannelCount = 2;
-		static constexpr auto writeGranularityInFrames = 32;  // Measured empirically
+		static constexpr auto hardwareQueueSizeInFrames = 1024u;  // Measured empirically
+		static constexpr auto inputChannelCount = 2u;
+		static constexpr auto outputChannelCount = 2u;
+		static constexpr auto writeGranularityInFrames = 32u;  // Measured empirically
 		
 		QA401(std::string_view devicePath);
 		~QA401();
