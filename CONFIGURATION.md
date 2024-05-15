@@ -81,7 +81,7 @@ louder), and vice-versa.
 **Note:** the purpose of this option is to adjust output gain and attenuator
 settings. The value entered here is NOT calibrated. The true full scale output
 voltage may deviate from this setting by several dB, and therefore should not be
-used for accurate absolute input voltage readings. If that's what you're after,
+used for accurate absolute output voltage readings. If that's what you're after,
 you will want to do your own separate calibration.
 
 **QA403/QA402 only:** the allowed values are `-12.0`, `-2.0`, `+8.0` and
