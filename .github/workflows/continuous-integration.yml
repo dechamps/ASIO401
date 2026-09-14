@@ -2,6 +2,10 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # libsndfile's cmake_minimum_required predates CMake 4's removal of
+      # compatibility with CMake < 3.5; this tells CMake to configure it anyway.
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
     strategy:
       fail-fast: false
       matrix:
@@ -64,13 +68,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ASIO401-installer
-      - uses: sigstore/gh-action-sigstore-python@v2.1.0
+      - uses: sigstore/gh-action-sigstore-python@v3.5.0
         with:
           inputs: "*"
       - uses: actions/upload-artifact@v4
         with:
           name: sigstore
-          path: "*.sigstore"
+          path: "*.sigstore.json"
           if-no-files-found: error
   release:
     runs-on: ubuntu-latest
@@ -87,7 +91,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: sigstore
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: "*"
