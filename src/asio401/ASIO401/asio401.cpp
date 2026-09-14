@@ -946,15 +946,23 @@ namespace asio401 {
 	}
 
 	void ASIO401::PreparedState::RunningState::RunningState::TearDownDevice() {
+		const auto& config = preparedState.asio401.config;
 		preparedState.asio401.WithDevice([&](QA401& qa401) {
-			// The QA401 output will exhibit a lingering DC offset if we don't reset it. Also, (re-)engage the attenuator just to be safe.
+			// Always reset, regardless of resetLevelsOnClose: this works around a QA401 bug where
+			// the output is left with a lingering DC offset otherwise, not just a safety precaution.
 			qa401.Reset(
-				QA401::InputHighPassFilterState::ENGAGED, QA401::AttenuatorState::ENGAGED, *GetQA401SampleRate(sampleRate)
+				QA401::InputHighPassFilterState::ENGAGED,
+				QA401::AttenuatorState::ENGAGED,
+				*GetQA401SampleRate(sampleRate)
 			);
 			},
 			[&](QA403& qa403) {
-				// Re-engage the attenuators just to be safe.
-				qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12, QA403::SampleRate::KHZ48);
+				if (config.resetLevelsOnClose) {
+					qa403.Reset(QA403::FullScaleInputLevel::DBV42, QA403::FullScaleOutputLevel::DBVn12, QA403::SampleRate::KHZ48);
+				}
+				else {
+					qa403.Reset(GetQA403FullScaleInputLevel(config), GetQA403FullScaleOutputLevel(config), *GetQA403SampleRate(sampleRate));
+				}
 			});
 	}
 

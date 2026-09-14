@@ -189,6 +189,25 @@ forceRead = true
 
 The default value is `false`.
 
+### Option `resetLevelsOnClose`
+
+*Boolean*-typed, QA403/QA402 only. Determines whether ASIO401 resets the full
+scale input/output levels (see [`fullScaleInputLevelDBV`][] and
+[`fullScaleOutputLevelDBV`][]) to their safe defaults every time streaming
+stops, instead of leaving your configured levels in place.
+
+Set to `false` if your host restarts the stream frequently (e.g. ArtaSoftware
+Steps, once per step of a sweep) and you're hearing the input relay click on
+every restart. Leave at the default if that doesn't apply to you.
+
+Example:
+
+```toml
+resetLevelsOnClose = false
+```
+
+The default value is `true`.
+
 ### (DEPRECATED) Option `attenuator`
 
 **Deprecated, use `maxInputLevelDBV` instead.**
@@ -201,6 +220,8 @@ The default value is `false`.
 *ASIO is a trademark and software of Steinberg Media Technologies GmbH*
 
 [bufferSizeSamples]: #option-bufferSizeSamples
+[`fullScaleInputLevelDBV`]: #option-fullscaleinputleveldbv
+[`fullScaleOutputLevelDBV`]: #option-fullscaleoutputleveldbv
 [configuration file]: https://en.wikipedia.org/wiki/Configuration_file
 [GUI]: https://en.wikipedia.org/wiki/Graphical_user_interface
 [INI files]: https://en.wikipedia.org/wiki/INI_file

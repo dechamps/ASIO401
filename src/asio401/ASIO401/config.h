@@ -10,6 +10,7 @@ namespace asio401 {
 		std::optional<double> fullScaleOutputLevelDBV;
 		std::optional<int64_t> bufferSizeSamples;
 		bool forceRead = false;
+		bool resetLevelsOnClose = true;
 	};
 
 	std::optional<Config> LoadConfig();

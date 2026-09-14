@@ -7,6 +7,7 @@
 #include <cassert>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <span>
 #include <variant>

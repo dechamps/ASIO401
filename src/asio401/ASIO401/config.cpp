@@ -93,6 +93,7 @@ namespace asio401 {
 			SetOption(table, "fullScaleOutputLevelDBV", config.fullScaleOutputLevelDBV);
 			SetOption(table, "bufferSizeSamples", config.bufferSizeSamples, ValidateBufferSize);
 			SetOption(table, "forceRead", config.forceRead);
+			SetOption(table, "resetLevelsOnClose", config.resetLevelsOnClose);
 
 			if (attenuator.has_value()) {
 				if (config.fullScaleInputLevelDBV.has_value())
